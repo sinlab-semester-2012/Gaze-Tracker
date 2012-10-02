@@ -31,7 +31,7 @@ public abstract class SampleCvViewBase extends SurfaceView implements SurfaceHol
         Log.i(TAG, "openCamera");
         synchronized (this) {
 	        releaseCamera();
-	        mCamera = new VideoCapture(Highgui.CV_CAP_ANDROID + 1);
+	        mCamera = new VideoCapture(Highgui.CV_CAP_ANDROID);
 	        if (!mCamera.isOpened()) {
 	            mCamera.release();
 	            mCamera = null;
@@ -120,7 +120,6 @@ public abstract class SampleCvViewBase extends SurfaceView implements SurfaceHol
             if (bmp != null) {
                 Canvas canvas = mHolder.lockCanvas();
                 if (canvas != null) {
-                	canvas.drawColor(0);
                     canvas.drawBitmap(bmp, (canvas.getWidth() - bmp.getWidth()) / 2, (canvas.getHeight() - bmp.getHeight()) / 2, null);
                     mFps.draw(canvas, (canvas.getWidth() - bmp.getWidth()) / 2, 0);
                     mHolder.unlockCanvasAndPost(canvas);
