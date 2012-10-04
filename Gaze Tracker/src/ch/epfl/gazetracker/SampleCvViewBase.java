@@ -31,7 +31,7 @@ public abstract class SampleCvViewBase extends SurfaceView implements SurfaceHol
         Log.i(TAG, "openCamera");
         synchronized (this) {
 	        releaseCamera();
-	        mCamera = new VideoCapture(Highgui.CV_CAP_ANDROID);
+	        mCamera = new VideoCapture(Highgui.CV_CAP_ANDROID + 1);
 	        if (!mCamera.isOpened()) {
 	            mCamera.release();
 	            mCamera = null;

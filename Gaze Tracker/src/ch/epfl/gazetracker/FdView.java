@@ -19,6 +19,7 @@ import org.opencv.highgui.Highgui;
 import org.opencv.highgui.VideoCapture;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.objdetect.CascadeClassifier;
+import org.opencv.objdetect.Objdetect;
 
 import ch.epfl.gazetracker.R;
 
@@ -48,9 +49,9 @@ class FdView extends SampleCvViewBase {
         super(context);
 
         try {
-            InputStream is = context.getResources().openRawResource(R.raw.haarcascade_frontalface_alt);
+            InputStream is = context.getResources().openRawResource(R.raw.haarcascade_frontalface_alt2);
             File cascadeDir = context.getDir("cascade", Context.MODE_PRIVATE);
-            bufferFile = new File(cascadeDir, "haarcascade_frontalface_alt.xml");
+            bufferFile = new File(cascadeDir, "haarcascade_frontalface_alt2.xml");
             FileOutputStream os = new FileOutputStream(bufferFile);
 
             byte[] buffer = new byte[4096];
@@ -116,84 +117,98 @@ class FdView extends SampleCvViewBase {
 
 	@Override
     protected Bitmap processFrame(VideoCapture capture) {
+        long ts = System.currentTimeMillis();
         capture.retrieve(mRgba, Highgui.CV_CAP_ANDROID_COLOR_FRAME_RGBA);
         capture.retrieve(mGray, Highgui.CV_CAP_ANDROID_GREY_FRAME);        
+        long te = System.currentTimeMillis();            
+        Log.e(TAG, "retrieving pictures from camera takes : " + (te - ts));
         
         MatOfRect faces = new MatOfRect();
         
         int minSize = mRgba.rows() < mRgba.cols() ? mRgba.rows() : mRgba.cols();
         
-    	if (faceCascade != null) {
-            faceCascade.detectMultiScale(mGray, faces, 1.2, 10, 0, new Size(minSize/2, minSize/24), new Size(minSize, minSize)); //maxSize is not used...
-    	}
-    	        
-        Rect[] facesArray = faces.toArray();
+        ts = System.currentTimeMillis();
+        faceCascade.detectMultiScale(mGray, faces, 1.2, 8, Objdetect.CASCADE_SCALE_IMAGE, new Size(minSize/2, minSize/2), new Size(minSize, minSize));
+        te = System.currentTimeMillis();            
+        Log.e(TAG, "face detection takes : " + (te - ts));
+        
+        Rect[] facesArray = faces.toArray();        
+        Log.e(TAG, "number of faces detected : " + facesArray.length);
+        
         for (int i = 0; i < facesArray.length; i++) {
             MatOfRect eyes = new MatOfRect();
+            Mat faceMat = mGray.submat(facesArray[i]);
+            
+            ts = System.currentTimeMillis();
+            //approximating the eye's position, may be improved, but will need a shifting if done
+            faceMat = faceMat.rowRange(0, faceMat.rows() / 2); 
+            eyesCascade.detectMultiScale(faceMat, eyes, 1.2, 5, 0, new Size(faceMat.cols() / 6, faceMat.cols() / 6), new Size(faceMat.rows() / 4, faceMat.rows() / 4));
+            te = System.currentTimeMillis();            
+            Log.e(TAG, "eyes detection takes : " + (te - ts));
 
-            Mat sub = mGray.submat(facesArray[i]);
-            
-            //long ts = System.currentTimeMillis();
-            sub = sub.rowRange(0, sub.rows() / 2); // approximating the eye's position, may be improved, but will need a shifting if done
-            eyesCascade.detectMultiScale(sub, eyes, 1.1, 10, 0, new Size(50, 50), new Size(0, 0));
-            //long te = System.currentTimeMillis();
-            
-            //Log.e(TAG, "detection takes : " + (te - ts));
-            
-            
             Rect[] eyesArray = eyes.toArray();
-            for (int j = 0; j < eyesArray.length; j++) {
-            	
-            	Mat subSub = sub.submat(eyesArray[j]);
-            	//Mat circles = new Mat();
-            	
-            	
+            for (int j = 0; j < eyesArray.length; j++) {            	
+            	Mat eyeMat = faceMat.submat(eyesArray[j]);
                 
-                subSub.submat(0, subSub.rows() * 9 / 10, 0, subSub.cols() * 9 / 10);
-                Imgproc.GaussianBlur(subSub, subSub, new Size(9, 9), 2, 2 );
-
+                ts = System.currentTimeMillis();
+                Imgproc.GaussianBlur(eyeMat, eyeMat, new Size(9, 9), 2, 2);
+                //Here we find one of the darkest pixel, one of because we don't check every pixel, but only 1/5
             	double brightness = 255;
-            	int xpos = 0;
-            	int ypos = 0;
-                for (int a = 0; a < subSub.rows(); a = a + 5) {
-                	for (int b = 0; b < subSub.cols(); b = b + 5) {
-                		double[] pixel = subSub.get(a, b);
+            	//int xpos = 0;
+            	//int ypos = 0;
+                for (int a = 0; a < eyeMat.rows(); a = a + 5) {
+                	for (int b = 0; b < eyeMat.cols(); b = b + 5) {
+                		double[] pixel = eyeMat.get(a, b);
                 		if (pixel[0] < brightness) {
                 			brightness = pixel[0];
-                			xpos = a;
-                			ypos = b;
+                			//xpos = a;
+                			//ypos = b;
                 		}
                 	}
                 }
+                te = System.currentTimeMillis();            
+                Log.e(TAG, "finding darkest pixel takes : " + (te - ts));
                 
-                Core.circle(mRgba, sum(sum(eyesArray[j].tl(), facesArray[i].tl()),  new Point(xpos,  ypos)), 4, CIRCLES_COLOR);
-                Mat teye = subSub.clone();
-                Imgproc.threshold(subSub, teye, brightness + 5, 255, Imgproc.THRESH_BINARY);
+                Mat teye = eyeMat.clone();
+                Imgproc.threshold(eyeMat, teye, brightness + 5, 255, Imgproc.THRESH_BINARY);
                 
                 List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
-                Mat h = new Mat();
-                Mat teyec = teye.clone();
-                Imgproc.findContours(teyec.clone(), contours, h, Imgproc.RETR_TREE, Imgproc.CHAIN_APPROX_NONE);
+                Mat hierarchy = new Mat();
+                
+                //Need to find something better than this shit, because it detects the "outest" contour of the image i.e. the border -_-
+                Imgproc.findContours(teye.clone(), contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_NONE);
                 Log.e(TAG, "number of contours found : " + contours.size());
-                
-                if (contours.size() == 2) {
-                	Point[] contoursP = contours.get(1).toArray();
-                	Log.e(TAG, "number of points " + contoursP.length);
-            		Point bar = new Point(0, 0);
+        		Point bar = new Point(0, 0);
 
-                	for (int p = 0; p < contoursP.length; p++) {
-                		bar = sum(bar, contoursP[p]);
+        		double maxArea = 0;
+        		Point[] maxContour = null;
+        		double pupilArea = 0;
+        		Point[] pupilContour = null;
+                for (MatOfPoint contour : contours) {
+                	double area = Imgproc.contourArea(contour);
+                	
+                	if (area >= maxArea) {
+                		pupilArea = maxArea;
+                		pupilContour = maxContour;
+                		maxArea = area;
+                		maxContour = contour.toArray();
+                	} else if (area >= pupilArea) {
+                		pupilArea = area;
+                		pupilContour = contour.toArray();
                 	}
+				}
+                if (pupilContour != null) {
+                	Log.e(TAG, "number of points " + pupilContour.length);
                 	
-                	
-                	bar = new Point(bar.x / contoursP.length, bar.y / contoursP.length);
-                    Core.circle(teyec, bar, 3, BLACK_COLOR, -1, 8, 0 );
+                	for (int p = 0; p < pupilContour.length; p++) {
+                		bar = sum(bar, pupilContour[p]);
+                	}
+                    
+                	bar = new Point(bar.x / pupilContour.length, bar.y / pupilContour.length);
 
+                    Core.circle(mRgba, sum(sum(eyesArray[j].tl(), facesArray[i].tl()),  bar), 3, CIRCLES_COLOR, -1, 8, 0);
                 }
-                //Imgproc.cvtColor(teyec, teyec, Imgproc.COLOR_RGB2RGBA);
-                
-                //Imgproc.drawContours(teyec, contours, -1, CIRCLES_COLOR, -1);
-                
+            	
                 
                 Log.e(TAG, "going to save image... " + savingImage);
                 if (savingImage) {
@@ -201,44 +216,16 @@ class FdView extends SampleCvViewBase {
                 	MyUtils.saveImage(mRgba, "1 - color image");
                 	MyUtils.saveImage(mGray, "2 - gray image");
                     MyUtils.saveImage(mGray.submat(facesArray[i]), "3 - face");
-                    MyUtils.saveImage(sub, "4 - face and manual eye approximation");
-                    MyUtils.saveImage(subSub, "5 - eye");
+                    MyUtils.saveImage(faceMat, "4 - face and manual eye approximation");
+                    MyUtils.saveImage(eyeMat, "5 - eye");
                     MyUtils.saveImage(teye, "6 - thresholded eye");
-                    MyUtils.saveImage(teyec, "7 - thresholded eye with contours");
+                    //MyUtils.saveImage(teyec, "7 - thresholded eye with contours");
                     Log.e(TAG, "saving image... done");
                     savingImage = false;
-
-                }
-                
-            	//Imgproc.threshold(subSub, subSub, 35, 255, Imgproc.THRESH_BINARY);
-            	//Imgproc.HoughCircles(subSub, circles, Imgproc.CV_HOUGH_GRADIENT, 1, 1, 200, 100, 0, 0);            	
-            	
-                /*
-            	if (circles.cols() == 0) {
-            		Log.e(TAG, "no pupils detected :(");
-            	} else {
-            		Log.e(TAG, "pupils detected !");
-            	}
-            	
-            	for (int x = 0; x < circles.cols(); x++) 
-                {
-                        double vCircle[] = circles.get(0,x);
-
-                        Point center = new Point(Math.round(vCircle[0]), Math.round(vCircle[1]));
-                        int radius = (int)Math.round(vCircle[2]);
-                        // draw the circle center
-                        Core.circle(mRgba, center, 3, CIRCLES_COLOR, -1, 8, 0 );
-                        // draw the circle outline
-                        Core.circle(mRgba, center, radius, CIRCLES_COLOR, 3, 8, 0 );
-
-                }
-				*/
-            	
+                }            	
             	
                 Core.rectangle(mRgba, sum(eyesArray[j].tl(), facesArray[i].tl()), sum(eyesArray[j].br(), facesArray[i].tl()), EYES_RECT_COLOR, 3);
-                Log.e(TAG, "" + eyesArray[j].size());
-                
-                
+                Log.e(TAG, "" + eyesArray[j].size());                
             }
         	
         	
