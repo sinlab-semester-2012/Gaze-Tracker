@@ -104,8 +104,9 @@ public abstract class SampleCvViewBase extends SurfaceView implements SurfaceHol
             Bitmap bmp = null;
 
             synchronized (this) {
-                if (mCamera == null)
+                if (mCamera == null) {
                     break;
+                }
 
                 if (!mCamera.grab()) {
                     Log.e(TAG, "mCamera.grab() failed");
