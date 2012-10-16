@@ -53,6 +53,8 @@ public abstract class SampleCvViewBase extends SurfaceView implements SurfaceHol
     }
     
     public void setupCamera(int width, int height) {
+    	Log.e(TAG, width + ", " + height);
+    	
         Log.i(TAG, "setupCamera("+width+", "+height+")");
         synchronized (this) {
             if (mCamera != null && mCamera.isOpened()) {
@@ -64,6 +66,8 @@ public abstract class SampleCvViewBase extends SurfaceView implements SurfaceHol
                 {
                     double minDiff = Double.MAX_VALUE;
                     for (Size size : sizes) {
+                    	Log.e(TAG, size.toString());
+                    	
                         if (Math.abs(size.height - height) < minDiff) {
                             mFrameWidth = (int) size.width;
                             mFrameHeight = (int) size.height;
@@ -76,6 +80,7 @@ public abstract class SampleCvViewBase extends SurfaceView implements SurfaceHol
                 mCamera.set(Highgui.CV_CAP_PROP_FRAME_HEIGHT, mFrameHeight);
             }
         }
+        
 
     }
     
@@ -122,7 +127,7 @@ public abstract class SampleCvViewBase extends SurfaceView implements SurfaceHol
                 Canvas canvas = mHolder.lockCanvas();
                 if (canvas != null) {
                     canvas.drawBitmap(bmp, (canvas.getWidth() - bmp.getWidth()) / 2, (canvas.getHeight() - bmp.getHeight()) / 2, null);
-                    mFps.draw(canvas, (canvas.getWidth() - bmp.getWidth()) / 2, 0);
+                    mFps.draw(canvas, (canvas.getWidth() - bmp.getWidth()) / 2, (canvas.getHeight() - bmp.getHeight()) / 2);
                     mHolder.unlockCanvasAndPost(canvas);
                 }
                 bmp.recycle();
