@@ -1,4 +1,5 @@
 package ch.epfl.gazetracker;
+
 import java.util.List;
 
 import org.opencv.core.Size;
@@ -12,128 +13,132 @@ import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
-public abstract class SampleCvViewBase extends SurfaceView implements SurfaceHolder.Callback, Runnable {
-    private static final String TAG = "Sample::SurfaceView";
+public abstract class SampleCvViewBase extends SurfaceView implements
+		SurfaceHolder.Callback, Runnable {
+	private static final String TAG = "Sample::SurfaceView";
 
-    private SurfaceHolder       mHolder;
-    private VideoCapture        mCamera;
-    private FpsMeter            mFps;
+	private SurfaceHolder mHolder;
+	private VideoCapture mCamera;
+	private FpsMeter mFps;
 
-    public SampleCvViewBase(Context context) {
-        super(context);
-        mHolder = getHolder();
-        mHolder.addCallback(this);
-        mFps = new FpsMeter();
-        Log.i(TAG, "Instantiated new " + this.getClass());
-    }
+	public SampleCvViewBase(Context context) {
+		super(context);
+		mHolder = getHolder();
+		mHolder.addCallback(this);
+		mFps = new FpsMeter();
+		Log.i(TAG, "Instantiated new " + this.getClass());
+	}
 
-    public boolean openCamera() {
-        Log.i(TAG, "openCamera");
-        synchronized (this) {
-	        releaseCamera();
-	        mCamera = new VideoCapture(Highgui.CV_CAP_ANDROID + 1);
-	        if (!mCamera.isOpened()) {
-	            mCamera.release();
-	            mCamera = null;
-	            Log.e(TAG, "Failed to open native camera");
-	            return false;
-	        }
-	    }
-        return true;
-    }
-    
-    public void releaseCamera() {
-        Log.i(TAG, "releaseCamera");
-        synchronized (this) {
-	        if (mCamera != null) {
-	                mCamera.release();
-	                mCamera = null;
-            }
-        }
-    }
-    
-    public void setupCamera(int width, int height) {
-    	Log.e(TAG, width + ", " + height);
-    	
-        Log.i(TAG, "setupCamera("+width+", "+height+")");
-        synchronized (this) {
-            if (mCamera != null && mCamera.isOpened()) {
-                List<Size> sizes = mCamera.getSupportedPreviewSizes();
-                int mFrameWidth = width;
-                int mFrameHeight = height;
+	public boolean openCamera() {
+		Log.i(TAG, "openCamera");
+		synchronized (this) {
+			releaseCamera();
+			mCamera = new VideoCapture(Highgui.CV_CAP_ANDROID + 1);
+			if (!mCamera.isOpened()) {
+				mCamera.release();
+				mCamera = null;
+				Log.e(TAG, "Failed to open native camera");
+				return false;
+			}
+		}
+		return true;
+	}
 
-                // selecting optimal camera preview size
-                {
-                    double minDiff = Double.MAX_VALUE;
-                    for (Size size : sizes) {
-                    	Log.e(TAG, size.toString());
-                    	
-                        if (Math.abs(size.height - height) < minDiff) {
-                            mFrameWidth = (int) size.width;
-                            mFrameHeight = (int) size.height;
-                            minDiff = Math.abs(size.height - height);
-                        }
-                    }
-                }
+	public void releaseCamera() {
+		Log.i(TAG, "releaseCamera");
+		synchronized (this) {
+			if (mCamera != null) {
+				mCamera.release();
+				mCamera = null;
+			}
+		}
+	}
 
-                mCamera.set(Highgui.CV_CAP_PROP_FRAME_WIDTH, mFrameWidth);
-                mCamera.set(Highgui.CV_CAP_PROP_FRAME_HEIGHT, mFrameHeight);
-            }
-        }
-        
+	public void setupCamera(int width, int height) {
+		Log.i(TAG, "setupCamera(" + width + ", " + height + ")");
+		synchronized (this) {
+			if (mCamera != null && mCamera.isOpened()) {
+				List<Size> sizes = mCamera.getSupportedPreviewSizes();
+				int mFrameWidth = width;
+				int mFrameHeight = height;
 
-    }
-    
-    public void surfaceChanged(SurfaceHolder _holder, int format, int width, int height) {
-        Log.i(TAG, "surfaceChanged");
-        setupCamera(width, height);
-    }
+				// selecting optimal camera preview size
+				double minDiff = Double.MAX_VALUE;
+				for (Size size : sizes) {
+					if (Math.abs(size.height - height) < minDiff) {
+						mFrameWidth = (int) size.width;
+						mFrameHeight = (int) size.height;
+						minDiff = Math.abs(size.height - height);
+					}
+				}
 
-    public void surfaceCreated(SurfaceHolder holder) {
-        Log.i(TAG, "surfaceCreated");
-        (new Thread(this)).start();
-    }
+				mCamera.set(Highgui.CV_CAP_PROP_FRAME_WIDTH, mFrameWidth);
+				mCamera.set(Highgui.CV_CAP_PROP_FRAME_HEIGHT, mFrameHeight);
+			}
+		}
 
-    public void surfaceDestroyed(SurfaceHolder holder) {
-        Log.i(TAG, "surfaceDestroyed");
-        releaseCamera();
-    }
+	}
 
-    protected abstract Bitmap processFrame(VideoCapture capture);
+	public void surfaceChanged(SurfaceHolder _holder, int format, int width,
+			int height) {
+		Log.i(TAG, "surfaceChanged");
+		setupCamera(width, height);
+	}
 
-    public void run() {
-        Log.i(TAG, "Starting processing thread");
-        mFps.init();
+	public void surfaceCreated(SurfaceHolder holder) {
+		Log.i(TAG, "surfaceCreated");
+		(new Thread(this)).start();
+	}
 
-        while (true) {
-            Bitmap bmp = null;
+	public void surfaceDestroyed(SurfaceHolder holder) {
+		Log.i(TAG, "surfaceDestroyed");
+		releaseCamera();
+	}
 
-            synchronized (this) {
-                if (mCamera == null) {
-                    break;
-                }
+	protected abstract Bitmap processFrame(VideoCapture capture);
 
-                if (!mCamera.grab()) {
-                    Log.e(TAG, "mCamera.grab() failed");
-                    break;
-                }
+	protected abstract void draw(Canvas canvas, float offsetx, float offsety);
 
-                bmp = processFrame(mCamera);
+	public void run() {
+		Log.i(TAG, "Starting processing thread");
+		mFps.init();
 
-                mFps.measure();
-            }
+		while (true) {
+			Bitmap bmp = null;
 
-            if (bmp != null) {
-                Canvas canvas = mHolder.lockCanvas();
-                if (canvas != null) {
-                    canvas.drawBitmap(bmp, (canvas.getWidth() - bmp.getWidth()) / 2, (canvas.getHeight() - bmp.getHeight()) / 2, null);
-                    mFps.draw(canvas, (canvas.getWidth() - bmp.getWidth()) / 2, (canvas.getHeight() - bmp.getHeight()) / 2);
-                    mHolder.unlockCanvasAndPost(canvas);
-                }
-                bmp.recycle();
-            }
-        }
+			synchronized (this) {
+				if (mCamera == null) {
+					break;
+				}
 
-        Log.i(TAG, "Finishing processing thread");
-    }
+				if (!mCamera.grab()) {
+					Log.e(TAG, "mCamera.grab() failed");
+					break;
+				}
+
+				bmp = processFrame(mCamera);
+
+				mFps.measure();
+			}
+
+			if (bmp != null) {
+				Canvas canvas = mHolder.lockCanvas();
+				if (canvas != null) {
+					canvas.drawBitmap(bmp,
+							(canvas.getWidth() - bmp.getWidth()) / 2,
+							(canvas.getHeight() - bmp.getHeight()) / 2, null);
+					mFps.draw(canvas, (canvas.getWidth() - bmp.getWidth()) / 2,
+							(canvas.getHeight() - bmp.getHeight()) / 2);
+					draw(canvas, (canvas.getWidth() - bmp.getWidth()) / 2,
+							(canvas.getHeight() - bmp.getHeight()) / 2 + 35);
+					// draw(canvas, (canvas.getWidth() - bmp.getWidth()) / 2,
+					// bmp.getHeight());
+					mHolder.unlockCanvasAndPost(canvas);
+				}
+				bmp.recycle();
+			}
+		}
+
+		Log.i(TAG, "Finishing processing thread");
+	}
 }

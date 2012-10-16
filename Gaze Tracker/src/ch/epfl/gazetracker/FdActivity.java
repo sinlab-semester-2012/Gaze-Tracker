@@ -19,6 +19,7 @@ public class FdActivity extends Activity {
 	private FdView mView;
 
 	private BaseLoaderCallback mOpenCVCallBack = new BaseLoaderCallback(this) {
+		
 		@Override
 		public void onManagerConnected(int status) {
 			switch (status) {

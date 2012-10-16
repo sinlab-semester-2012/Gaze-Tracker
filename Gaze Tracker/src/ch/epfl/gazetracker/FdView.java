@@ -23,6 +23,8 @@ import ch.epfl.gazetracker.R;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.util.Log;
 import android.view.SurfaceHolder;
 
@@ -43,6 +45,8 @@ class FdView extends SampleCvViewBase {
     private static final Scalar	  EYES_RECT_COLOR = new Scalar(255, 0, 0, 255);
     private static final Scalar   BLUE_COLOR = new Scalar(0, 0, 255, 255);
     private static final Scalar   WHITE_COLOR = new Scalar(255, 255, 255, 255);
+    
+    private String direction = "";
     
     
     public FdView(Context context) {
@@ -218,39 +222,17 @@ class FdView extends SampleCvViewBase {
             //////////////////////////
             
             if (eyesArray != null && nose != null) {
-            	Point centerLeftEye = Tracker.offset(eyesArray[0].tl(), eyesArray[0].br());
-            	centerLeftEye.x /= 2;
-            	centerLeftEye.y /= 2;
+            	double leftX = (eyesArray[0].tl().x + eyesArray[0].br().x)/2;
+            	double rightX = (eyesArray[1].tl().x + eyesArray[1].br().x)/2;
+            	double noseX = (nose.tl().x + nose.br().x)/2;
+
             	
-            	Point centerRightEye = Tracker.offset(eyesArray[1].tl(), eyesArray[1].br());
-            	centerRightEye.x /= 2;
-            	centerRightEye.y /= 2;
+            	double d = leftX - rightX;
+            	direction = (int)((leftX - noseX) * 150 / d) - 75 + "";
             	
-            	Point centerNose = Tracker.offset(nose.tl(), nose.br());
-            	centerNose.x /= 2;
-            	centerNose.y /= 2;
-            	
-            	double d = centerLeftEye.x - centerRightEye.x;
-            	String direction = "";
-            	if (centerLeftEye.x - centerNose.x < d/7) {
-            		direction = "45°L";
-            	} else if (centerLeftEye.x - centerNose.x < 2*d/7){
-            		direction = "30°L";
-            	} else if (centerLeftEye.x - centerNose.x < 3*d/7){
-            		direction = "15°L";
-            	} else if (centerLeftEye.x - centerNose.x < 4*d/7){
-            		direction = "0°";
-            	} else if (centerLeftEye.x - centerNose.x < 5*d/7){
-            		direction = "15°R";
-            	} else if (centerLeftEye.x - centerNose.x < 6*d/7){
-            		direction = "30°R";
-            	} else if (centerLeftEye.x - centerNose.x < d){
-            		direction = "45°R";
-            	} else {
-            		direction = "error";
-            	}
-            	
-            	Log.e(TAG, "The direction is : " + direction);
+            	//Log.e(TAG, "The direction is : " + direction);
+            } else {
+            	direction = "";
             }
             
             
@@ -358,6 +340,13 @@ class FdView extends SampleCvViewBase {
         Log.d(TAG, "Processing frame : " + (tee - tss) + " ms.");
         return bmp;
         
+    }
+	
+	public void draw(Canvas canvas, float offsetx, float offsety) {
+		Paint paint = new Paint();
+        paint.setColor(Color.BLUE);
+        paint.setTextSize(50);
+        canvas.drawText(direction, 20 + offsetx, 10 + 50 + offsety, paint);
     }
 	
     @Override
