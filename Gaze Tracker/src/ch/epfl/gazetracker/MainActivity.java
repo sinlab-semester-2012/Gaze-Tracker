@@ -13,10 +13,10 @@ import android.view.Menu;
 import android.view.Window;
 import android.view.WindowManager;
 
-public class FdActivity extends Activity {
-	private static final String TAG = "Sample::Activity";
+public class MainActivity extends Activity {
+	private static final String TAG = "Activity";
 
-	private FdView mView;
+	private View mView;
 
 	private BaseLoaderCallback mOpenCVCallBack = new BaseLoaderCallback(this) {
 		
@@ -26,7 +26,7 @@ public class FdActivity extends Activity {
 				case LoaderCallbackInterface.SUCCESS: {
 					Log.i(TAG, "OpenCV loaded successfully");
 					// Create and set View
-					mView = new FdView(mAppContext);
+					mView = new View(mAppContext);
 					setContentView(mView);
 					// Check native OpenCV camera
 					if (!mView.openCamera()) {
@@ -53,7 +53,7 @@ public class FdActivity extends Activity {
 		}
 	};
 
-	public FdActivity() {
+	public MainActivity() {
 		Log.i(TAG, "Instantiated new " + this.getClass());
 	}
 

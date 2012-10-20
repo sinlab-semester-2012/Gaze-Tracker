@@ -13,27 +13,32 @@ import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
-public abstract class SampleCvViewBase extends SurfaceView implements
-		SurfaceHolder.Callback, Runnable {
-	private static final String TAG = "Sample::SurfaceView";
+class View extends SurfaceView implements SurfaceHolder.Callback, Runnable {
+	private static final String TAG = "View";
 
-	private SurfaceHolder mHolder;
 	private VideoCapture mCamera;
 	private FpsMeter mFps;
+	private SurfaceHolder mHolder;
+	private Tracker mTracker;
 
-	public SampleCvViewBase(Context context) {
+	public View(Context context) {
 		super(context);
+		
+		Log.i(TAG, "Instantiated new " + this.getClass());
+		
+		mFps = new FpsMeter();
 		mHolder = getHolder();
 		mHolder.addCallback(this);
-		mFps = new FpsMeter();
-		Log.i(TAG, "Instantiated new " + this.getClass());
+		mTracker = new Tracker(context);
 	}
 
 	public boolean openCamera() {
 		Log.i(TAG, "openCamera");
+		
 		synchronized (this) {
 			releaseCamera();
 			mCamera = new VideoCapture(Highgui.CV_CAP_ANDROID + 1);
+			
 			if (!mCamera.isOpened()) {
 				mCamera.release();
 				mCamera = null;
@@ -41,11 +46,13 @@ public abstract class SampleCvViewBase extends SurfaceView implements
 				return false;
 			}
 		}
+		
 		return true;
 	}
 
 	public void releaseCamera() {
 		Log.i(TAG, "releaseCamera");
+		
 		synchronized (this) {
 			if (mCamera != null) {
 				mCamera.release();
@@ -79,8 +86,7 @@ public abstract class SampleCvViewBase extends SurfaceView implements
 
 	}
 
-	public void surfaceChanged(SurfaceHolder _holder, int format, int width,
-			int height) {
+	public void surfaceChanged(SurfaceHolder _holder, int format, int width, int height) {
 		Log.i(TAG, "surfaceChanged");
 		setupCamera(width, height);
 	}
@@ -95,13 +101,10 @@ public abstract class SampleCvViewBase extends SurfaceView implements
 		releaseCamera();
 	}
 
-	protected abstract Bitmap processFrame(VideoCapture capture);
-
-	protected abstract void draw(Canvas canvas, float offsetx, float offsety);
-
 	public void run() {
 		Log.i(TAG, "Starting processing thread");
 		mFps.init();
+		
 
 		while (true) {
 			Bitmap bmp = null;
@@ -116,7 +119,7 @@ public abstract class SampleCvViewBase extends SurfaceView implements
 					break;
 				}
 
-				bmp = processFrame(mCamera);
+				bmp = mTracker.processFrame(mCamera);
 
 				mFps.measure();
 			}
@@ -129,9 +132,8 @@ public abstract class SampleCvViewBase extends SurfaceView implements
 							(canvas.getHeight() - bmp.getHeight()) / 2, null);
 					mFps.draw(canvas, (canvas.getWidth() - bmp.getWidth()) / 2,
 							(canvas.getHeight() - bmp.getHeight()) / 2);
-					draw(canvas, (canvas.getWidth() - bmp.getWidth()) / 2,
+					mTracker.draw(canvas, (canvas.getWidth() - bmp.getWidth()) / 2,
 							(canvas.getHeight() - bmp.getHeight()) / 2 + 35);
-					// draw(canvas, (canvas.getWidth() - bmp.getWidth()) / 2,
 					// bmp.getHeight());
 					mHolder.unlockCanvasAndPost(canvas);
 				}
