@@ -37,7 +37,7 @@ public class Tracker {
     
     private String direction;
     
-    private boolean savingImage = false;
+    private boolean savingImage = true;
 	
 	private CascadeClassifier 	  faceClassifier;
     private CascadeClassifier     eyeClassifier;
@@ -50,7 +50,7 @@ public class Tracker {
     private Paint paint;
     
     public Tracker(Context context) {
-    	/////Let's load the classifier...
+    	/////Let's load the classifiers...
     	try {
     		///// Load the face classifier
             InputStream is = context.getResources().openRawResource(R.raw.haarcascade_frontalface_alt2);
@@ -65,7 +65,6 @@ public class Tracker {
             }
             is.close();
             os.close();
-
             faceClassifier = new CascadeClassifier(bufferFile.getAbsolutePath());
 
             if (faceClassifier.empty()) {
@@ -140,13 +139,12 @@ public class Tracker {
 		long tss = System.currentTimeMillis();
 		
         long ts = System.currentTimeMillis();
-        //capture.retrieve(mRgba, Highgui.CV_CAP_ANDROID_COLOR_FRAME_RGBA);
         capture.retrieve(mGray, Highgui.CV_CAP_ANDROID_GREY_FRAME);      
         mGrayClone = mGray.clone();
         long te = System.currentTimeMillis();
         Log.d(TAG, "Retrieving pictures from camera : " + (te - ts) + " ms.");
         
-        direction = "";
+        direction = "Face(s) not found.";
         
         ts = System.currentTimeMillis();
         Rect[] facesArray = detectFaces(mGray);        
@@ -169,14 +167,21 @@ public class Tracker {
                 Log.d(TAG, "Eyes detection : " + (te - ts) + " ms.");
                 
                 if (eyesArray != null) {
-                	double leftX = (eyesArray[0].tl().x + eyesArray[0].br().x)/2;
-                	double rightX = (eyesArray[1].tl().x + eyesArray[1].br().x)/2;
-                	double noseX = (nose.tl().x + nose.br().x)/2;
-
+                	ts = System.currentTimeMillis();
+                	Point[] leftCorners = detectCorners(faceMat, eyesArray[0], true);
+                	Point[] rightCorners = detectCorners(faceMat, eyesArray[1], false);
+                    te = System.currentTimeMillis();
+                    Log.d(TAG, "Corners detection : " + (te - ts) + " ms.");
                 	
-                	double d = leftX - rightX;
-                	direction = (int)((leftX - noseX) * 150 / d) - 75 + "";
-                    
+                	if (leftCorners != null && rightCorners != null) {
+                		double leftX = (eyesArray[0].tl().x + eyesArray[0].br().x)/2;
+                    	double rightX = (eyesArray[1].tl().x + eyesArray[1].br().x)/2;
+                    	double noseX = (nose.tl().x + nose.br().x)/2;
+
+                    	double d = leftX - rightX;
+                    	direction = (int)((leftX - noseX) * 150 / d) - 75 + "";
+                	}                	
+                	
 
     		        for (int j = 0; j < eyesArray.length; j++) {
     		        	
@@ -210,14 +215,15 @@ public class Tracker {
     		            Core.rectangle(mGrayClone, Tracker.offset(facesArray[i].tl(), eyesArray[j].tl()), Tracker.offset(facesArray[i].tl(), eyesArray[j].br()), EYES_RECT_COLOR, 3);
     		        }
                 } else {
+                	direction = "Eye(s) not found.";
                 	Log.d(TAG, "Haven't found an eye.");
                 }
                 
                 Core.rectangle(mGrayClone, Tracker.offset(facesArray[i].tl(), nose.tl()), Tracker.offset(facesArray[i].tl(), nose.br()), EYES_RECT_COLOR, 3);
-            }            
-            else {
+            } else {
+            	direction = "Nose not found.";
             	Log.d(TAG, "Haven't found any nose.");
-            }            
+            }
             Core.rectangle(mGrayClone, facesArray[i].tl(), facesArray[i].br(), FACE_RECT_COLOR, 3);
         }
         	
@@ -225,7 +231,7 @@ public class Tracker {
         Bitmap bmp = Bitmap.createBitmap(mGrayClone.cols(), mGrayClone.rows(), Bitmap.Config.ARGB_8888);
 
         try {
-        	Utils.matToBitmap(mGrayClone, bmp);
+        	Utils.matToBitmap(mGray, bmp);
         } catch(Exception e) {
         	Log.e(TAG, "Utils.matToBitmap() throws an exception: " + e.getMessage());
             bmp.recycle();
@@ -238,26 +244,56 @@ public class Tracker {
         
     }
     
-    private Point[] detectCorners(Mat face, Rect eye) {
+    private Point[] detectCorners(Mat face, Rect eye, boolean left) {
     	Point tl = new Point(eye.x - 0.1 * eye.width, eye.y + 0.25 * eye.height);
     	Point br = new Point(eye.br().x + 0.1 * eye.width, eye.br().y - 0.25 * eye.height);
-    	Rect newRoi = new Rect(tl, br);            	
+    	Rect newRoi = new Rect(tl, br);
 
     	Mat testMat = face.submat(newRoi);
     	
-    	// We blur the center of the eyes to not be annoyed by pupil or whatever, but just need corners
-    	Mat center = testMat.colRange(testMat.cols() / 4, 3 * testMat.cols() / 4);
-    	Imgproc.GaussianBlur(center, center, new Size(9, 9), 2, 2);
-
-    	MatOfPoint points = new MatOfPoint();
-    	Imgproc.goodFeaturesToTrack(testMat, points, 2, 0.01, testMat.width() / 1.5);
-    	return points.toArray();
+    	Mat leftCorner = testMat.colRange(0, testMat.cols() / 5);
+    	Mat rightCorner = testMat.colRange(4 * testMat.cols() / 5, testMat.cols());
+    	
+    	MatOfPoint leftPoints = new MatOfPoint();
+    	Imgproc.goodFeaturesToTrack(leftCorner, leftPoints, 1, 0.01, 0);
+    	MatOfPoint rightPoints = new MatOfPoint();
+    	Imgproc.goodFeaturesToTrack(rightCorner, rightPoints, 1, 0.01, 0);
+    	
+    	if (leftPoints.empty() || rightPoints.empty()) {
+    		return null;
+    	}
+    	
+    	Point[] leftArray = leftPoints.toArray();
+    	Point[] rightArrPoints = rightPoints.toArray();
+    	
+    	Core.circle(testMat, leftArray[0], 3, PUPIL_COLOR, -1, 8, 0);
+    	Core.circle(testMat, offset(rightArrPoints[0], new Point(4 * testMat.cols() / 5, 0)), 3, PUPIL_COLOR, -1, 8, 0);
+    	if (savingImage) {
+        	
+        	MyUtils.saveImage(testMat, "testCorners");
+    	}
+    	
+    	Point[] cornersArray = new Point[2];
+    	if (left) {
+    		cornersArray[0] = leftArray[0];
+    		cornersArray[1] = rightArrPoints[0];
+    	} else {
+    		cornersArray[0] = rightArrPoints[0];
+    		cornersArray[1] = leftArray[0];
+    	}
+    	
+    	return cornersArray;
     }
     
-    
+    /**
+     * Detects faces of different sizes in the input image. The detected faces are returned as an array of rectangles.
+     * @param img Matrix containing an image where faces need to be detected.
+     * @return An array of rectangles where each rectangle contains the detected face.
+     */
 	private Rect[] detectFaces(Mat img) {
         MatOfRect faces = new MatOfRect();
         
+       	//The minimum size is set to be a third of the image size.
         faceClassifier.detectMultiScale(img, faces, 1.2, 1, Objdetect.CASCADE_SCALE_IMAGE, new Size(img.rows()/3, img.cols()/3), new Size(img.rows(), img.cols()));
         
         return faces.toArray();
@@ -274,8 +310,8 @@ public class Tracker {
 		MatOfRect rightEye = new MatOfRect();
 		MatOfRect leftEye = new MatOfRect();
 
-		eyeClassifier.detectMultiScale(rightArea, rightEye, 1.2, 5, Objdetect.CASCADE_FIND_BIGGEST_OBJECT | Objdetect.CASCADE_DO_ROUGH_SEARCH, new Size(rightArea.cols() / 3, rightArea.cols() / 3), new Size(rightArea.rows(), rightArea.rows()));
-		eyeClassifier.detectMultiScale(leftarea, leftEye, 1.2, 5, Objdetect.CASCADE_FIND_BIGGEST_OBJECT | Objdetect.CASCADE_DO_ROUGH_SEARCH, new Size(leftEye.cols() / 3, leftEye.cols() / 3), new Size(leftEye.rows(), leftEye.rows()));
+		eyeClassifier.detectMultiScale(rightArea, rightEye, 1.2, 3, Objdetect.CASCADE_FIND_BIGGEST_OBJECT | Objdetect.CASCADE_DO_ROUGH_SEARCH, new Size(rightArea.cols() / 3, rightArea.cols() / 3), new Size(rightArea.rows(), rightArea.rows()));
+		eyeClassifier.detectMultiScale(leftarea, leftEye, 1.2, 3, Objdetect.CASCADE_FIND_BIGGEST_OBJECT | Objdetect.CASCADE_DO_ROUGH_SEARCH, new Size(leftEye.cols() / 3, leftEye.cols() / 3), new Size(leftEye.rows(), leftEye.rows()));
 
 		if (rightEye.empty() || leftEye.empty()) {
 			return null;
@@ -294,13 +330,18 @@ public class Tracker {
         return eyesArray;
 	}
 	
+	/**
+     * Detects one nose in the input image. The detected nose is returned as a rectangle.
+     * @param img Matrix containing a face where nose need to be detected.
+     * @return A rectangle containing the detected nose, or null if no nose has been detected.
+     */
 	public Rect detectNose(Mat face) {
-		Rect roi = new Rect(new Point(0, face.rows() / 4), new Point(face.cols(), 3 * face.rows() / 4));
+		Rect roi = new Rect(new Point(face.cols() / 4, face.rows() / 4), new Point(3 * face.cols() / 4, 3 * face.rows() / 4));
 		face = face.submat(roi);
 		
 		MatOfRect noses = new MatOfRect();
 		
-		noseClassifier.detectMultiScale(face, noses, 1.2, 1, Objdetect.CASCADE_FIND_BIGGEST_OBJECT | Objdetect.CASCADE_DO_ROUGH_SEARCH, new Size(0, 0), new Size(face.cols(), face.rows()));
+		noseClassifier.detectMultiScale(face, noses, 1.2, 3, Objdetect.CASCADE_FIND_BIGGEST_OBJECT | Objdetect.CASCADE_DO_ROUGH_SEARCH, new Size(face.rows() / 2, face.rows() / 2), new Size(face.cols(), face.rows()));
 
 		if (noses.empty()) {
 			return null;
@@ -369,14 +410,13 @@ public class Tracker {
         return bar;        
 	}
 	
-	public static Point detectWhite(Mat eye) {
+	/*public static Point detectWhite(Mat eye) {
 		Mat eyeClone = eye.clone();
 		
 		// Manual approximation of the eye itself
 		Rect roi = new Rect(new Point(0, eyeClone.rows() / 3), new Point(eyeClone.cols(), 2 * eyeClone.rows() / 3));
 		eyeClone = eyeClone.submat(roi);
 		
-        
         double minBrightness = 0;
         
         for (int a = 0; a < eyeClone.rows(); a = a + 5) {
@@ -413,7 +453,7 @@ public class Tracker {
         
         return bar;  
 	
-	}
+	}*/
 	
 	public static Point offset(Point p, Point offset) {
 		p.x += offset.x;
@@ -428,6 +468,6 @@ public class Tracker {
 	}
 	
 	public void draw(Canvas canvas, float offsetx, float offsety) {
-        canvas.drawText(direction, 20 + offsetx, 10 + 50 + offsety, paint);
+        canvas.drawText(direction, 10 + offsetx, 10 + 50 + offsety, paint);
     }
 }

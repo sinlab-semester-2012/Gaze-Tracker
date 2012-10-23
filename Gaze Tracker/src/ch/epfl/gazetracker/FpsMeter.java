@@ -9,41 +9,38 @@ import android.graphics.Paint;
 import android.util.Log;
 
 public class FpsMeter {
-    private static final String TAG       = "FpsMeter";
-    int                         step;
-    int                         framesCouner;
-    double                      freq;
-    long                        prevFrameTime;
-    String                      strfps;
-    DecimalFormat               twoPlaces = new DecimalFormat("0.00");
-    Paint                       paint;
+    private static final String TAG = "FpsMeter";
+    private static final int STEP = 20;
+    private static final double FREQ = Core.getTickFrequency();
+    private static final DecimalFormat FORMAT = new DecimalFormat("0.00");
+    private static final Paint PAINT = new Paint();
+    
+    private int framesCounter;
+    private long prevFrameTime;
+    private String strfps;
 
     public void init() {
-        step = 20;
-        framesCouner = 0;
-        freq = Core.getTickFrequency();
+        framesCounter = 0;
         prevFrameTime = Core.getTickCount();
         strfps = "";
 
-        paint = new Paint();
-        paint.setColor(Color.BLUE);
-        paint.setTextSize(50);
+        PAINT.setColor(Color.BLUE);
+        PAINT.setTextSize(50);
     }
 
     public void measure() {
-        framesCouner++;
-        if (framesCouner % step == 0) {
+        framesCounter = (framesCounter + 1) % STEP;
+        
+        if (framesCounter == 0) {
             long time = Core.getTickCount();
-            double fps = step * freq / (time - prevFrameTime);
+            double fps = STEP * FREQ / (time - prevFrameTime);
             prevFrameTime = time;
-            DecimalFormat twoPlaces = new DecimalFormat("0.00");
-            strfps = twoPlaces.format(fps) + " FPS";
+            strfps = FORMAT.format(fps) + " FPS";
             Log.i(TAG, strfps);
         }
     }
 
     public void draw(Canvas canvas, float offsetx, float offsety) {
-        canvas.drawText(strfps, 20 + offsetx, 10 + 50 + offsety, paint);
+        canvas.drawText(strfps, 10 + offsetx, 10 + 50 + offsety, PAINT);
     }
-
 }

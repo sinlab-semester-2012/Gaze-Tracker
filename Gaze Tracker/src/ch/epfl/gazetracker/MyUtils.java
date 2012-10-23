@@ -13,8 +13,7 @@ import android.util.Log;
 
 public class MyUtils {
 	public static void saveImage(Mat img, String filename) {
-		Bitmap bmp = Bitmap.createBitmap(img.cols(), img.rows(),
-				Bitmap.Config.ARGB_8888);
+		Bitmap bmp = Bitmap.createBitmap(img.cols(), img.rows(), Bitmap.Config.ARGB_8888);
 
 		try {
 			Utils.matToBitmap(img, bmp);

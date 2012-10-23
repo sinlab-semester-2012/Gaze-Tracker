@@ -127,14 +127,9 @@ class View extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 			if (bmp != null) {
 				Canvas canvas = mHolder.lockCanvas();
 				if (canvas != null) {
-					canvas.drawBitmap(bmp,
-							(canvas.getWidth() - bmp.getWidth()) / 2,
-							(canvas.getHeight() - bmp.getHeight()) / 2, null);
-					mFps.draw(canvas, (canvas.getWidth() - bmp.getWidth()) / 2,
-							(canvas.getHeight() - bmp.getHeight()) / 2);
-					mTracker.draw(canvas, (canvas.getWidth() - bmp.getWidth()) / 2,
-							(canvas.getHeight() - bmp.getHeight()) / 2 + 35);
-					// bmp.getHeight());
+					canvas.drawBitmap(bmp, (canvas.getWidth() - bmp.getWidth()) / 2, (canvas.getHeight() - bmp.getHeight()) / 2, null);
+					mFps.draw(canvas, (canvas.getWidth() - bmp.getWidth()) / 2, (canvas.getHeight() - bmp.getHeight()) / 2);
+					mTracker.draw(canvas, (canvas.getWidth() - bmp.getWidth()) / 2, (canvas.getHeight() - bmp.getHeight()) / 2 + 50);
 					mHolder.unlockCanvasAndPost(canvas);
 				}
 				bmp.recycle();
