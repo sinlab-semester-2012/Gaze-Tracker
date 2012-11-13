@@ -7,6 +7,8 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import netP5.NetAddress;
+
 import org.opencv.android.Utils;
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
@@ -22,6 +24,9 @@ import org.opencv.imgproc.Imgproc;
 import org.opencv.objdetect.CascadeClassifier;
 import org.opencv.objdetect.Objdetect;
 
+import oscP5.OscMessage;
+import oscP5.OscP5;
+
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -31,7 +36,10 @@ import android.util.Log;
 
 public class Tracker {
     private static final String TAG = "Tracker";
-    private static final Paint PAINT = new Paint();
+
+	private NetAddress myBroadcastLocation;
+	
+    private static final Paint 	  PAINT = new Paint();
     private static final Scalar   FACE_RECT_COLOR = new Scalar(0);
     private static final Scalar	  EYES_RECT_COLOR = new Scalar(51);
     private static final Scalar   PUPIL_COLOR = new Scalar(255);
@@ -52,7 +60,7 @@ public class Tracker {
     	faceClassifier = new CascadeClassifier();
     	loadClassifier(context, faceClassifier, R.raw.haarcascade_frontalface_alt2, "haarcascade_frontalface_alt2.xml");
     	eyeClassifier = new CascadeClassifier();
-    	loadClassifier(context, eyeClassifier, R.raw.haarcascade_eye, "haarcascade_eye.xml");
+    	loadClassifier(context, eyeClassifier, R.raw.haarcascade_eye, "haarcascade_eye");
     	noseClassifier = new CascadeClassifier();
     	loadClassifier(context, noseClassifier, R.raw.haarcascade_mcs_nose, "haarcascade_mcs_nose.xml");
 
@@ -64,6 +72,8 @@ public class Tracker {
 
         PAINT.setColor(Color.YELLOW);
         PAINT.setTextSize(50);
+
+        myBroadcastLocation = new NetAddress("128.179.156.181",32000);
     }
 
     protected Bitmap processFrame(VideoCapture capture) {
@@ -75,11 +85,11 @@ public class Tracker {
         Rect[] facesArray = detectFaces(mGray);
         long te = System.currentTimeMillis();
         Log.d(TAG, "Face detection : " + (te - ts) + " ms.");
-        
+
         if (facesArray.length == 0) {
         	directionText("Face(s) not found.");
         }
-        
+
         for (int i = 0; i < facesArray.length; i++) {
         	long tfs = System.currentTimeMillis();
         	
@@ -131,12 +141,16 @@ public class Tracker {
                         	directionEye = "Eyes : " + (int)((360 / eyeLength) * dprime - 180) + "°";                        	
                         	totalDir = "Total: " + ((int)((leftX - noseX) * 150 / d) - 75 + (int)((360 / eyeLength) * dprime - 180)) + "°";
                         	
+                        	OscMessage myOscMessage = new OscMessage("/gaze");
+                        	myOscMessage.add(((int)((leftX - noseX) * 150 / d) - 75 + (int)((360 / eyeLength) * dprime - 180)));
+                        	OscP5.flush(myOscMessage, myBroadcastLocation);
+                        	
                         	//Draw the left pupil
                         	Core.circle(mGray, Tracker.offset(facesArray[i].tl(), Tracker.offset(eyesArray[0].tl(), leftPupil)), 3, PUPIL_COLOR, -1, 8, 0);
                     	} else {
                         	directionText("Pupil not found.");
                         }
-                		
+
                 	} else {
                     	directionText("Corners not found.");
                     }
@@ -214,7 +228,7 @@ public class Tracker {
 		if (noses.empty()) {
 			return null;
 		}
-		
+
 		return offset((noses.toArray())[0], roi.tl());
 	}
     
