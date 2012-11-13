@@ -99,12 +99,12 @@ public class Tracker {
                 if (eyesArray != null) {
                 	ts = System.currentTimeMillis();
                 	//////////////
-                	Point tl = new Point(eyesArray[0].x - 0.1 * eyesArray[0].width, eyesArray[0].y + 0.25 * eyesArray[0].height);
-                	Point br = new Point(eyesArray[0].br().x + 0.1 * eyesArray[0].width, eyesArray[0].br().y - 0.25 * eyesArray[0].height);
+                	Point tl = new Point(eyesArray[0].x - 0.1 * eyesArray[0].width, eyesArray[0].y + 0.33 * eyesArray[0].height);
+                	Point br = new Point(eyesArray[0].br().x + 0.1 * eyesArray[0].width, eyesArray[0].br().y - 0.33 * eyesArray[0].height);
                 	Rect leftEye = new Rect(tl, br);
                 	
-                	Point tl2 = new Point(eyesArray[1].x - 0.1 * eyesArray[1].width, eyesArray[1].y + 0.25 * eyesArray[1].height);
-                	Point br2 = new Point(eyesArray[1].br().x + 0.1 * eyesArray[1].width, eyesArray[1].br().y - 0.25 * eyesArray[1].height);
+                	Point tl2 = new Point(eyesArray[1].x - 0.1 * eyesArray[1].width, eyesArray[1].y + 0.33 * eyesArray[1].height);
+                	Point br2 = new Point(eyesArray[1].br().x + 0.1 * eyesArray[1].width, eyesArray[1].br().y - 0.33 * eyesArray[1].height);
                 	Rect rightRoi = new Rect(tl2, br2);
                 	/////////////////
                 	
@@ -193,7 +193,6 @@ public class Tracker {
 	private Rect[] detectFaces(Mat img) {
         MatOfRect faces = new MatOfRect();
         
-       	//The minimum size is set to be a third of the image size.
         faceClassifier.detectMultiScale(img, faces, 1.2, 1, Objdetect.CASCADE_SCALE_IMAGE, new Size(img.rows()/5, img.cols()/5), new Size(img.rows(), img.cols()));
         
         return faces.toArray();
@@ -260,8 +259,8 @@ public class Tracker {
 	private Point[] detectCorners3(Mat eye, boolean left) {
 		Mat eyeClone = eye.clone();
     	
-    	Mat leftCornerArea = eyeClone.colRange(0, eyeClone.cols() / 4);
-    	Mat rightCornerArea = eyeClone.colRange(3 * eyeClone.cols() / 4, eyeClone.cols());
+    	Mat leftCornerArea = eyeClone.colRange(0, (int)(eyeClone.cols() / 3.5));
+    	Mat rightCornerArea = eyeClone.colRange((int)(2.5 * eyeClone.cols() / 3.5), eyeClone.cols());
     	    	
     	Imgproc.blur(leftCornerArea, leftCornerArea, new Size(3, 3));
     	Imgproc.blur(rightCornerArea, rightCornerArea, new Size(3, 3));
@@ -278,7 +277,7 @@ public class Tracker {
         	}
         }
         
-        Imgproc.threshold(leftCornerArea, leftCornerArea, minBrightness + 5, 255, Imgproc.THRESH_BINARY_INV);
+        Imgproc.threshold(leftCornerArea, leftCornerArea, minBrightness, 255, Imgproc.THRESH_BINARY_INV);
 
         Point leftCorner = null;
         boolean found = false;
@@ -305,7 +304,7 @@ public class Tracker {
         	}
         }
         
-        Imgproc.threshold(rightCornerArea, rightCornerArea, minBrightness + 5, 255, Imgproc.THRESH_BINARY_INV);
+        Imgproc.threshold(rightCornerArea, rightCornerArea, minBrightness, 255, Imgproc.THRESH_BINARY_INV);
 
         Point rightCorner = null;
         found = false;
