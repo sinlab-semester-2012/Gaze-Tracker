@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import netP5.NetAddress;
 
@@ -36,6 +37,7 @@ import android.util.Log;
 
 public class Tracker {
     private static final String TAG = "Tracker";
+    private static final String id = UUID.randomUUID().toString();
 
 	private NetAddress myBroadcastLocation;
 	
@@ -50,7 +52,7 @@ public class Tracker {
     private String directionEye;
     private String totalDir;
 
-    private boolean debugImage = false;
+    private boolean debugImage = true;
 
 	private CascadeClassifier 	  faceClassifier;
     private CascadeClassifier     eyeClassifier;
@@ -73,27 +75,21 @@ public class Tracker {
         PAINT.setColor(Color.YELLOW);
         PAINT.setTextSize(50);
 
-        myBroadcastLocation = new NetAddress("128.179.156.181",32000);
+        myBroadcastLocation = new NetAddress("128.179.154.237",32000);
     }
 
     protected Bitmap processFrame(VideoCapture capture) {
-		long tss = System.currentTimeMillis();
+		long processingStart = System.currentTimeMillis();
 		
         capture.retrieve(mGray, Highgui.CV_CAP_ANDROID_GREY_FRAME);
         
         long ts = System.currentTimeMillis();
-        Rect[] facesArray = detectFaces(mGray);
+        Rect face = detectFaces(mGray);
         long te = System.currentTimeMillis();
         Log.d(TAG, "Face detection : " + (te - ts) + " ms.");
-
-        if (facesArray.length == 0) {
-        	directionText("Face(s) not found.");
-        }
-
-        for (int i = 0; i < facesArray.length; i++) {
-        	long tfs = System.currentTimeMillis();
-        	
-            Mat faceMat = mGray.submat(facesArray[i]);
+        
+        if (face != null) {
+            Mat faceMat = mGray.submat(face);
             
             ts = System.currentTimeMillis();
             Rect nose = detectNose(faceMat);
@@ -105,84 +101,76 @@ public class Tracker {
                 Rect[] eyesArray = detectEyes(faceMat);
                 te = System.currentTimeMillis();
                 Log.d(TAG, "Eyes detection : " + (te - ts) + " ms.");
-                
+
                 if (eyesArray != null) {
-                	ts = System.currentTimeMillis();
-                	//////////////
-                	Point tl = new Point(eyesArray[0].x - 0.1 * eyesArray[0].width, eyesArray[0].y + 0.33 * eyesArray[0].height);
-                	Point br = new Point(eyesArray[0].br().x + 0.1 * eyesArray[0].width, eyesArray[0].br().y - 0.33 * eyesArray[0].height);
+                	Point leftPupil = detectPupil(faceMat.submat(eyesArray[0]));
+                	Point rightPupil = detectPupil(faceMat.submat(eyesArray[1]));
+                	
+                	/*
+                	Point tl = new Point(eyesArray[0].x, eyesArray[0].y + 0.33 * eyesArray[0].height);
+                	Point br = new Point(eyesArray[0].br().x, eyesArray[0].br().y - 0.33 * eyesArray[0].height);
                 	Rect leftEye = new Rect(tl, br);
                 	
-                	Point tl2 = new Point(eyesArray[1].x - 0.1 * eyesArray[1].width, eyesArray[1].y + 0.33 * eyesArray[1].height);
-                	Point br2 = new Point(eyesArray[1].br().x + 0.1 * eyesArray[1].width, eyesArray[1].br().y - 0.33 * eyesArray[1].height);
+                	Point tl2 = new Point(eyesArray[1].x, eyesArray[1].y + 0.33 * eyesArray[1].height);
+                	Point br2 = new Point(eyesArray[1].br().x, eyesArray[1].br().y - 0.33 * eyesArray[1].height);
                 	Rect rightRoi = new Rect(tl2, br2);
-                	/////////////////
+                	*/
                 	
-                	Point[] leftCorners = detectCorners3(faceMat.submat(leftEye), true);
-                	Point[] rightCorners = detectCorners3(faceMat.submat(rightRoi), false);
-                    te = System.currentTimeMillis();
-                    Log.d(TAG, "Corners detection : " + (te - ts) + " ms.");
-                	
-                	if (leftCorners != null && rightCorners != null) {
-                    	Point leftPupil = detectPupil(faceMat.submat(eyesArray[0]));
-                    	
-                    	if (leftPupil != null) {
-                    		//TODO: use a stable point instead of the center of boxes...
-                    		double leftX = (eyesArray[0].tl().x + eyesArray[0].br().x)/2;
-                        	double rightX = (eyesArray[1].tl().x + eyesArray[1].br().x)/2;
-                        	double noseX = (nose.tl().x + nose.br().x)/2;
+                	if (leftPupil != null && rightPupil != null) {
+                		Point[] leftCorners = detectCorners3(faceMat.submat(eyesArray[0]), true);
+                		Point[] rightCorners = detectCorners3(faceMat.submat(eyesArray[1]), false);
+                		
+                		if (leftCorners != null && rightCorners != null) {
+                        		//TODO: use a stable point instead of the center of boxes...
+                        		double leftX = (eyesArray[0].tl().x + eyesArray[0].br().x)/2;
+                            	double rightX = (eyesArray[1].tl().x + eyesArray[1].br().x)/2;
+                            	double noseX = (nose.tl().x + nose.br().x)/2;
 
-                        	double d = leftX - rightX;
-                        	direction = "Face: " + (int)(((leftX - noseX) * 150 / d) - 75) + "°";
-                        	
-                        	double eyeLength = leftCorners[1].x - leftCorners[0].x;
-                        	double dprime = leftCorners[1].x - (leftPupil.x + faceMat.submat(eyesArray[0]).cols()/10);
+                            	double d = leftX - rightX;
+                            	direction = "Face: " + (int)(((leftX - noseX) * 150 / d) - 75) + "°";
+                            	
+                            	double eyeLength = leftCorners[1].x - leftCorners[0].x;
+                            	double dprime = leftCorners[1].x - (leftPupil.x + faceMat.submat(eyesArray[0]).cols()/10);
 
-                        	directionEye = "Eyes : " + (int)((360 / eyeLength) * dprime - 180) + "°";                        	
-                        	totalDir = "Total: " + ((int)((leftX - noseX) * 150 / d) - 75 + (int)((360 / eyeLength) * dprime - 180)) + "°";
-                        	
-                        	OscMessage myOscMessage = new OscMessage("/gaze");
-                        	myOscMessage.add(((int)((leftX - noseX) * 150 / d) - 75 + (int)((360 / eyeLength) * dprime - 180)));
-                        	OscP5.flush(myOscMessage, myBroadcastLocation);
-                        	
-                        	//Draw the left pupil
-                        	Core.circle(mGray, Tracker.offset(facesArray[i].tl(), Tracker.offset(eyesArray[0].tl(), leftPupil)), 3, PUPIL_COLOR, -1, 8, 0);
+                            	directionEye = "Eyes : " + (int)((360 / eyeLength) * dprime - 180) + "°";                        	
+                            	totalDir = "Total: " + ((int)((leftX - noseX) * 150 / d) - 75 + (int)((360 / eyeLength) * dprime - 180)) + "°";
+                            	
+                            	OscMessage myOscMessage = new OscMessage("/gaze");
+                            	myOscMessage.add(id);
+                            	myOscMessage.add(System.currentTimeMillis());
+                            	myOscMessage.add(((int)((leftX - noseX) * 150 / d) - 75 + (int)((360 / eyeLength) * dprime - 180)));
+                            	
+                            	OscP5.flush(myOscMessage, myBroadcastLocation);
+                            	
+                            	//Draw the left pupil
+                            	Core.circle(mGray, MyUtils.offset(MyUtils.offset(leftPupil, eyesArray[0].tl()), face.tl()), 3, PUPIL_COLOR, -1, 8, 0);
+
                     	} else {
-                        	directionText("Pupil not found.");
+                        	directionText("Corners not found.");
                         }
-
                 	} else {
-                    	directionText("Corners not found.");
+                    	directionText("Pupil not found.");
                     }
                 	
-                	Log.d(TAG, "going to save image... " + debugImage);
-		            if (debugImage) {
-		            	Log.e(TAG, "saving image...");
-		            	MyUtils.saveImage(mGray, "1 - gray image");
-		                MyUtils.saveImage(mGray.submat(facesArray[i]), "2 - face");
-		                debugImage = false;
-		            }
-		            
 		            //Draw the rectangles around left and right eyes.
-		            Core.rectangle(mGray, Tracker.offset(facesArray[i].tl(), eyesArray[0].tl()), Tracker.offset(facesArray[i].tl(), eyesArray[0].br()), EYES_RECT_COLOR, 3);
-		            Core.rectangle(mGray, Tracker.offset(facesArray[i].tl(), eyesArray[1].tl()), Tracker.offset(facesArray[i].tl(), eyesArray[1].br()), EYES_RECT_COLOR, 3);
+		            Core.rectangle(mGray, MyUtils.offset(eyesArray[0].tl(), face.tl()), MyUtils.offset(eyesArray[0].br(), face.tl()), EYES_RECT_COLOR, 3);
+		            Core.rectangle(mGray, MyUtils.offset(eyesArray[1].tl(), face.tl()), MyUtils.offset(eyesArray[1].br(), face.tl()), EYES_RECT_COLOR, 3);
                 } else {
                 	directionText("Eye(s) not found.");
                 }
                 
                 //Draw the rectangle around the nose.
-                Core.rectangle(mGray, Tracker.offset(facesArray[i].tl(), nose.tl()), Tracker.offset(facesArray[i].tl(), nose.br()), EYES_RECT_COLOR, 3);
+                Core.rectangle(mGray, MyUtils.offset(nose.tl(), face.tl()), MyUtils.offset(nose.br(), face.tl()), EYES_RECT_COLOR, 3);
             } else {
             	directionText("Nose not found.");
             }
             //Draw the rectangle around the face.
-            Core.rectangle(mGray, facesArray[i].tl(), facesArray[i].br(), FACE_RECT_COLOR, 3);
-            
-            long tfe = System.currentTimeMillis();            
-            Log.d(TAG, "Face processing : " + (tfe - tfs) + " ms.");
+            Core.rectangle(mGray, face.tl(), face.br(), FACE_RECT_COLOR, 3);
+        } else {
+        	directionText("Face not found.");
         }
         	
-
+    	ts = System.currentTimeMillis();
         Bitmap bmp = Bitmap.createBitmap(mGray.cols(), mGray.rows(), Bitmap.Config.ARGB_8888);
 
         try {
@@ -192,219 +180,41 @@ public class Tracker {
             bmp.recycle();
             bmp = null;
         }
-        
-        long tee = System.currentTimeMillis();
-        Log.d(TAG, "Processing frame : " + (tee - tss) + " ms.");
+        te = System.currentTimeMillis();
+        Log.d(TAG, "Creating Bitmap : " + (te - ts) + " ms.");
+        long processingEnd = System.currentTimeMillis();
+        Log.d(TAG, "Processing frame : " + (processingEnd - processingStart) + " ms.");
         return bmp;
     }
 
-    /**
-     * Detects faces of different sizes in the input image. The detected faces are returned as an array of rectangles.
-     * @param img Matrix containing an image where faces need to be detected.
-     * @return An array of rectangles where each rectangle contains the detected face.
-     * @see <a href="http://www.google.fr/">http://www.google.fr/</a>
-     */
-	private Rect[] detectFaces(Mat img) {
+	private Rect detectFaces(Mat img) {
         MatOfRect faces = new MatOfRect();
-        
-        faceClassifier.detectMultiScale(img, faces, 1.2, 1, Objdetect.CASCADE_SCALE_IMAGE, new Size(img.rows()/5, img.cols()/5), new Size(img.rows(), img.cols()));
-        
-        return faces.toArray();
+
+        faceClassifier.detectMultiScale(img, faces, 1.5, 1, Objdetect.CASCADE_SCALE_IMAGE, new Size(img.rows()/5, img.cols()/5), new Size(img.rows(), img.cols()));
+
+        if (faces.empty()) {
+        	return null;
+        } else {
+        	return MyUtils.getBiggestRect(faces.toArray());
+        }
 	}
 
-	/**
-     * Detects one nose in the input image. The detected nose is returned as a rectangle.
-     * @param img Matrix containing a face where nose need to be detected.
-     * @return A rectangle containing the detected nose, or null if no nose has been detected.
-     */
 	public Rect detectNose(Mat face) {
 		Rect roi = new Rect(new Point(face.cols() / 5, face.rows() / 5), new Point(4 * face.cols() / 5, 4 * face.rows() / 5));
 		face = face.submat(roi);
-		
+
 		MatOfRect noses = new MatOfRect();
 		
-		noseClassifier.detectMultiScale(face, noses, 1.2, 1, Objdetect.CASCADE_FIND_BIGGEST_OBJECT | Objdetect.CASCADE_DO_ROUGH_SEARCH, new Size(face.rows() / 3, face.rows() / 3), new Size(face.cols(), face.rows()));
+		noseClassifier.detectMultiScale(face, noses, 1.4, 1, Objdetect.CASCADE_SCALE_IMAGE, new Size(face.rows() / 3, face.rows() / 3), new Size(face.cols(), face.rows()));
 
 		if (noses.empty()) {
 			return null;
-		}
-
-		return offset((noses.toArray())[0], roi.tl());
+		} else {
+        	return MyUtils.offset(MyUtils.getBiggestRect(noses.toArray()), roi.tl());
+        }
 	}
-    
-	private Point[] detectCorners2(Mat face, Rect eye, boolean left) {    	
-    	Rect leftRoi = new Rect(new Point(eye.x, eye.y + 0.25 * eye.height), new Point(eye.x + eye.height/3, eye.y + 0.75 * eye.height));
-    	Rect rightRoi = new Rect(new Point(eye.x + 2*eye.height/3, eye.y + 0.25 * eye.height), new Point(eye.x + eye.height, eye.y + 0.75 * eye.height));
-    	
-    	Mat leftCorner = face.submat(leftRoi);
-    	Mat rightCorner = face.submat(rightRoi);
-    	
-    	MatOfPoint leftPoints = new MatOfPoint();
-    	Imgproc.goodFeaturesToTrack(leftCorner, leftPoints, 1, 0.01, 0, new Mat(), 15, true, 0.04);
-    	MatOfPoint rightPoints = new MatOfPoint();
-    	Imgproc.goodFeaturesToTrack(rightCorner, rightPoints, 1, 0.01, 0, new Mat(), 15, true, 0.04);
-    	
-    	if (leftPoints.empty() || rightPoints.empty()) {
-    		return null;
-    	}
-    	
-    	Point[] leftArray = leftPoints.toArray();
-    	Point[] rightArrPoints = rightPoints.toArray();
-    	
-    	Core.circle(leftCorner, leftArray[0], 3, PUPIL_COLOR, -1, 8, 0);
-    	Core.circle(rightCorner, rightArrPoints[0], 3, PUPIL_COLOR, -1, 8, 0);
-    	
-    	offset(leftArray[0], leftRoi.tl());
-    	offset(rightArrPoints[0], rightRoi.tl());
-    	
-    	Point[] cornersArray = new Point[2];
-    	if (left) {
-    		cornersArray[0] = leftArray[0];
-    		cornersArray[1] = rightArrPoints[0];
-    	} else {
-    		cornersArray[0] = rightArrPoints[0];
-    		cornersArray[1] = leftArray[0];
-    	}
-    	
-    	
-    	return cornersArray;
-	}
-	
-	private Point[] detectCorners3(Mat eye, boolean left) {
-		Mat eyeClone = eye.clone();
-    	
-    	Mat leftCornerArea = eyeClone.colRange(0, (int)(eyeClone.cols() / 3.5));
-    	Mat rightCornerArea = eyeClone.colRange((int)(2.5 * eyeClone.cols() / 3.5), eyeClone.cols());
-    	    	
-    	Imgproc.blur(leftCornerArea, leftCornerArea, new Size(3, 3));
-    	Imgproc.blur(rightCornerArea, rightCornerArea, new Size(3, 3));
-    	
-    	double minBrightness = 255;
-        
-        for (int a = 0; a < leftCornerArea.rows(); a = a + 5) {
-        	for (int b = 0; b < leftCornerArea.cols(); b = b + 5) {
-        		double[] pixel = leftCornerArea.get(a, b);
-        		
-        		if (pixel[0] < minBrightness) {
-        			minBrightness = pixel[0];
-        		}
-        	}
-        }
-        
-        Imgproc.threshold(leftCornerArea, leftCornerArea, minBrightness, 255, Imgproc.THRESH_BINARY_INV);
-
-        Point leftCorner = null;
-        boolean found = false;
-        for (int a = 0; a < leftCornerArea.cols() && !found; a++) {
-        	for (int b = 0; b < leftCornerArea.rows() && !found; b++) {
-        		double[] pixel = leftCornerArea.get(b, a);
-        		
-        		if (pixel[0] == 255) {
-        			found = true;
-        			leftCorner = new Point(a, b);
-        		}
-        	}
-        }
-        
-        minBrightness = 255;
-        
-        for (int a = 0; a < rightCornerArea.rows(); a = a + 5) {
-        	for (int b = 0; b < rightCornerArea.cols(); b = b + 5) {
-        		double[] pixel = rightCornerArea.get(a, b);
-        		
-        		if (pixel[0] < minBrightness) {
-        			minBrightness = pixel[0];
-        		}
-        	}
-        }
-        
-        Imgproc.threshold(rightCornerArea, rightCornerArea, minBrightness, 255, Imgproc.THRESH_BINARY_INV);
-
-        Point rightCorner = null;
-        found = false;
-        for (int a = rightCornerArea.cols() - 1; a >= 0 && !found; a--) {
-        	for (int b = 0; b < rightCornerArea.rows() && !found; b++) {
-        		double[] pixel = rightCornerArea.get(b, a);
-        		if (pixel[0] == 255) {
-        			found = true;
-        			rightCorner = new Point(a + 3 * eyeClone.cols() / 4, b);
-        		}
-        	}
-        }
-    	
-    	if (leftCorner == null || rightCorner == null) {
-    		return null;
-    	}
-    	
-    	Point[] cornersArray = new Point[2];
-    	
-    	Core.circle(eye, leftCorner, 3, PUPIL_COLOR, -1, 8, 0);
-    	Core.circle(eye, rightCorner, 3, PUPIL_COLOR, -1, 8, 0);
-    	    	
-    	if (left) {
-    		cornersArray[0] = leftCorner;
-    		cornersArray[1] = rightCorner;
-    	} else {
-    		cornersArray[0] = rightCorner;
-    		cornersArray[1] = leftCorner;
-    	}
-
-    	return cornersArray;
-	}
-    
-    private Point[] detectCorners(Mat face, Rect eye, boolean left) {
-    	Point tl = new Point(eye.x - 0.1 * eye.width, eye.y + 0.25 * eye.height);
-    	Point br = new Point(eye.br().x + 0.1 * eye.width, eye.br().y - 0.25 * eye.height);
-    	Rect newRoi = new Rect(tl, br);
-
-    	Mat testMat = face.submat(newRoi);
-    	
-    	Mat leftCorner = testMat.colRange(0, testMat.cols() / 3);
-    	Mat rightCorner = testMat.colRange(2 * testMat.cols() / 3, testMat.cols());
-    	
-    	if (debugImage) {
-    		MyUtils.saveImage(testMat, "AreaEye");
-    		MyUtils.saveImage(leftCorner, "leftAreaEye");
-    		MyUtils.saveImage(rightCorner, "rightAreaEye");   
-    		//debugImage = false;
-    	}
-    	
-    	
-    	MatOfPoint leftPoints = new MatOfPoint();
-    	Imgproc.goodFeaturesToTrack(leftCorner, leftPoints, 1, 0.01, 0, new Mat(), 15, true, 0.04);
-    	MatOfPoint rightPoints = new MatOfPoint();
-    	Imgproc.goodFeaturesToTrack(rightCorner, rightPoints, 1, 0.01, 0, new Mat(), 15, true, 0.04);
-    	
-    	if (leftPoints.empty() || rightPoints.empty()) {
-    		return null;
-    	}
-    	
-    	Point[] leftArray = leftPoints.toArray();
-    	Point[] rightArrPoints = rightPoints.toArray();
-    	
-    	Core.circle(testMat, leftArray[0], 3, PUPIL_COLOR, -1, 8, 0);
-    	Core.circle(testMat, offset(rightArrPoints[0], new Point(4 * testMat.cols() / 5, 0)), 3, PUPIL_COLOR, -1, 8, 0);
-    	if (debugImage) {
-        	
-        	MyUtils.saveImage(testMat, "testCorners");
-    	}
-    	
-    	Point[] cornersArray = new Point[2];
-    	if (left) {
-    		cornersArray[0] = leftArray[0];
-    		cornersArray[1] = rightArrPoints[0];
-    	} else {
-    		cornersArray[0] = rightArrPoints[0];
-    		cornersArray[1] = leftArray[0];
-    	}
-    	
-    	return cornersArray;
-    }
-    
-    
 	
 	private Rect[] detectEyes(Mat face) {
-		// Manual approximation of the eyes area
 		Rect roi = new Rect(new Point(0, face.rows() / 6), new Point(face.cols(), face.rows() / 1.8));
         face = face.submat(roi);
 
@@ -414,66 +224,64 @@ public class Tracker {
 		MatOfRect rightEye = new MatOfRect();
 		MatOfRect leftEye = new MatOfRect();
 
-		eyeClassifier.detectMultiScale(rightArea, rightEye, 1.1, 1, Objdetect.CASCADE_FIND_BIGGEST_OBJECT | Objdetect.CASCADE_DO_ROUGH_SEARCH, new Size(rightArea.cols() / 3, rightArea.cols() / 3), new Size(rightArea.rows(), rightArea.rows()));
-		eyeClassifier.detectMultiScale(leftarea, leftEye, 1.1, 1, Objdetect.CASCADE_FIND_BIGGEST_OBJECT | Objdetect.CASCADE_DO_ROUGH_SEARCH, new Size(leftEye.cols() / 3, leftEye.cols() / 3), new Size(leftEye.rows(), leftEye.rows()));
+		eyeClassifier.detectMultiScale(rightArea, rightEye, 1.2, 1, 0, new Size(rightArea.cols() / 3, rightArea.cols() / 3), new Size(rightArea.rows(), rightArea.rows()));
+		eyeClassifier.detectMultiScale(leftarea, leftEye, 1.2, 1, 0, new Size(leftarea.cols() / 3, leftarea.cols() / 3), new Size(leftarea.rows(), leftarea.rows()));
 
 		if (rightEye.empty() || leftEye.empty()) {
 			return null;
 		}
-		
-		Rect[] rightArray = rightEye.toArray();
-		Rect[] leftArray = leftEye.toArray();
-		
-		
+
 		Rect[] eyesArray = new Rect[2];
-		if (rightArray[0] != null && leftArray[0] != null) {
-			eyesArray[0] = offset(leftArray[0], new Point(face.cols() / 2, roi.tl().y));
-			eyesArray[1] = offset(rightArray[0], roi.tl());
-		}
+		eyesArray[0] = MyUtils.offset(MyUtils.getBiggestRect(leftEye.toArray()), new Point(face.cols() / 2, roi.tl().y));
+		eyesArray[1] = MyUtils.offset(MyUtils.getBiggestRect(rightEye.toArray()), roi.tl());
 		
         return eyesArray;
 	}
 	
-	
-	/**
-	 * Detects the pupil in the input image. The pupil position is returned as a point.
-	 * @param eye Matrix containing an eye where the pupil need to be detected.
-	 * @return The pupil center position.
-	 */
+	private int findIrisRadius(Mat eye, Point pupil) {
+		int d = 5;
+		while ((int)pupil.x - d >= 0 && (int)pupil.x + d < eye.cols() && (eye.get((int)pupil.y + 10, (int)pupil.x - d)[0] < 100 || eye.get((int)pupil.y + 10, (int)pupil.x + d)[0] < 100)) {
+			Log.d(TAG, "pupil center : " + pupil.x);
+			Log.d(TAG, "d : " + d);
+			Log.d(TAG, "eye.cols" + eye.cols());
+			d += 5;
+		}
+		
+		if ((int)pupil.x - d < 0 || (int)pupil.x + d >= eye.cols()) {
+			return 0;
+		} else {
+			Core.circle(eye, pupil, d, PUPIL_COLOR, 1, 8, 0);
+			return d;
+		}
+	}
+		
 	public static Point detectPupil(Mat eye) {
-		//We clone the matrix, to not break the original image.
 		Mat eyeClone = eye.clone();
 		
-		//Manual approximation of the pupil area.
 		Rect roi = new Rect(new Point(0, eyeClone.rows() / 3), new Point(eyeClone.cols(), 2 * eyeClone.rows() / 3));
 		eyeClone = eyeClone.submat(roi);
 		
-        Imgproc.GaussianBlur(eyeClone, eyeClone, new Size(9, 9), 2, 2);
+        Imgproc.blur(eyeClone, eyeClone, new Size(15, 15));
         
-        //We now have to look for <i>one of<i> the darkest pixel, which will belong to the pupil.
-        double minBrightness = 255;
-        
+        double minBrightness = 255;        
         for (int a = 0; a < eyeClone.rows(); a = a + 5) {
         	for (int b = 0; b < eyeClone.cols(); b = b + 5) {
         		double[] pixel = eyeClone.get(a, b);
-        		
+
         		if (pixel[0] < minBrightness) {
         			minBrightness = pixel[0];
         		}
         	}
         }
-        
-        //When it's done, we threshold the image to only keep the darkest area.
-        Imgproc.threshold(eyeClone, eyeClone, minBrightness + 5, 255, Imgproc.THRESH_BINARY_INV);
+
+        Imgproc.threshold(eyeClone, eyeClone, minBrightness + 15, 255, Imgproc.THRESH_BINARY_INV);
         
         List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
-        Mat hierarchy = new Mat();        
+        Mat hierarchy = new Mat();
         Imgproc.findContours(eyeClone, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_NONE);
         
-		//Pupil should be the biggest blob. Let's find it.
 		double pupilArea = 0;
 		Point[] pupilContour = null;
-		
         for (MatOfPoint contour : contours) {
         	double area = Imgproc.contourArea(contour);
         	
@@ -484,23 +292,91 @@ public class Tracker {
 		}
         
         Point bar = null;
-        
+
         if (pupilContour != null) {
         	bar = new Point(0, 0);
-            
+
             for (int p = 0; p < pupilContour.length; p++) {
             	bar.x += pupilContour[p].x;
             	bar.y += pupilContour[p].y;
             }
-            
+
             bar.x /= pupilContour.length;
             bar.y /= pupilContour.length;
 
-            
-            offset(bar, roi.tl());
+            MyUtils.offset(bar, roi.tl());
+        }
+
+        return bar;        
+	}
+
+
+	private Point[] detectCorners(Mat eye, boolean left, Point pupil) {
+		Mat eyeClone = eye.clone();
+
+		int d = findIrisRadius(eye, pupil);
+		//eyeClone = eyeClone.rowRange(eyeClone.rows() / 4, 3 * eyeClone.rows() / 4);
+
+		Log.d(TAG,"l : " + ((int)pupil.x - d));
+		Log.d(TAG,"r : " + ((int)pupil.x + d));
+		Mat leftArea = eyeClone.colRange(0, (int)pupil.x - d);
+		Mat rightArea = eyeClone.colRange((int)pupil.x + d, eyeClone.cols());
+		
+		int minLeftBrightness = findMinBrightness(leftArea, 5);
+		int minRightBrightness = findMinBrightness(rightArea, 5);
+		
+        Imgproc.threshold(leftArea, leftArea, minLeftBrightness + 15, 255, Imgproc.THRESH_BINARY);
+        Imgproc.threshold(rightArea, rightArea, minRightBrightness + 15, 255, Imgproc.THRESH_BINARY);
+/*
+        if (debugImage) {
+        	MyUtils.saveImage(eye, "eye");
+        	MyUtils.saveImage(leftArea, "leftArea");
+        	MyUtils.saveImage(rightArea, "rightArea");
+        	debugImage = false;
+        }
+*/
+        Point[] corners = new Point[2];
+        boolean found = false;
+        for (int i = leftArea.rows() - 1; i >= 0  && !found; i--) {
+			for (int j = 0; j < leftArea.cols() && !found; j++) {
+				if (leftArea.get(i, j)[0] == 0) {
+					if (left) {
+						corners[1] = new Point(j, i);
+				    	Core.circle(eye.colRange(0, (int)pupil.x - d), corners[1], 3, PUPIL_COLOR, -1, 8, 0);
+				    	found = true;
+					} else {
+						corners[0] = new Point(j, i);
+				    	Core.circle(eye.colRange(0, (int)pupil.x - d), corners[0], 3, PUPIL_COLOR, -1, 8, 0);
+				    	found = true;
+					}
+				}
+			}
+		}
+        if (!found) {
+        	return null;
         }
         
-        return bar;        
+        found = false;
+        for (int i = rightArea.rows() - 1; i >= 0  && !found; i--) {
+			for (int j = rightArea.cols() - 1; j >= 0 && !found; j--) {
+				if (rightArea.get(i, j)[0] == 0) {
+					if (left) {
+						corners[0] = MyUtils.offset(new Point(j, i), new Point((int)pupil.x + d + 5, 0));
+				    	Core.circle(eye.colRange((int)pupil.x + d, eyeClone.cols()), new Point(j, i), 3, PUPIL_COLOR, -1, 8, 0);
+				    	found = true;
+					} else {
+						corners[1] = MyUtils.offset(new Point(j, i), new Point((int)pupil.x + d + 5, 0));
+				    	Core.circle(eye.colRange((int)pupil.x + d, eyeClone.cols()), new Point(j, i), 3, PUPIL_COLOR, -1, 8, 0);
+				    	found = true;
+					}
+				}
+			}
+		}
+        if (!found) {
+        	return null;
+        }
+
+        return corners;        
 	}
 	
 	private void loadClassifier(Context context, CascadeClassifier classifier, int id, String name) {
@@ -530,18 +406,6 @@ public class Tracker {
 		}
 	}
 	
-	public static Point offset(Point p, Point offset) {
-		p.x += offset.x;
-		p.y += offset.y;
-		return p;
-    }
-	
-	public static Rect offset(Rect r, Point offset) {
-		r.x += offset.x;
-		r.y += offset.y;
-		return r;
-	}
-	
 	public void draw(Canvas canvas, float offsetx, float offsety) {
         canvas.drawText(direction, 10 + offsetx, 10 + 50 + offsety, PAINT);
         canvas.drawText(directionEye, 10 + offsetx, 10 + 50 + 50 + offsety, PAINT);
@@ -553,5 +417,105 @@ public class Tracker {
     	directionEye = message;
     	totalDir = message;
     	Log.d(TAG, message);
+	}
+	
+	private int findMinBrightness(Mat img, int accuracy) {
+		double brightness = 255;
+		
+		for (int i = 0; i < img.rows(); i+=accuracy) {
+			for (int j = 0; j < img.cols(); j+=accuracy) {
+				if (img.get(i, j)[0] < brightness) {
+					brightness = img.get(i, j)[0];
+				}
+			}
+		}
+		
+		return (int)brightness;
+	}
+	
+	private Point[] detectCorners3(Mat eye, boolean left) {
+		Mat eyeClone = eye.clone();
+
+		Mat leftCornerArea = eyeClone
+				.colRange(0, (int) (eyeClone.cols() / 3.5));
+		Mat rightCornerArea = eyeClone.colRange(
+				(int) (2.5 * eyeClone.cols() / 3.5), eyeClone.cols());
+
+		Imgproc.blur(leftCornerArea, leftCornerArea, new Size(3, 3));
+		Imgproc.blur(rightCornerArea, rightCornerArea, new Size(3, 3));
+
+		double minBrightness = 255;
+
+		for (int a = 0; a < leftCornerArea.rows(); a = a + 5) {
+			for (int b = 0; b < leftCornerArea.cols(); b = b + 5) {
+				double[] pixel = leftCornerArea.get(a, b);
+
+				if (pixel[0] < minBrightness) {
+					minBrightness = pixel[0];
+				}
+			}
+		}
+
+		Imgproc.threshold(leftCornerArea, leftCornerArea, minBrightness, 255,
+				Imgproc.THRESH_BINARY_INV);
+
+		Point leftCorner = null;
+		boolean found = false;
+		for (int a = 0; a < leftCornerArea.cols() && !found; a++) {
+			for (int b = 0; b < leftCornerArea.rows() && !found; b++) {
+				double[] pixel = leftCornerArea.get(b, a);
+
+				if (pixel[0] == 255) {
+					found = true;
+					leftCorner = new Point(a, b);
+				}
+			}
+		}
+
+		minBrightness = 255;
+
+		for (int a = 0; a < rightCornerArea.rows(); a = a + 5) {
+			for (int b = 0; b < rightCornerArea.cols(); b = b + 5) {
+				double[] pixel = rightCornerArea.get(a, b);
+
+				if (pixel[0] < minBrightness) {
+					minBrightness = pixel[0];
+				}
+			}
+		}
+
+		Imgproc.threshold(rightCornerArea, rightCornerArea, minBrightness, 255,
+				Imgproc.THRESH_BINARY_INV);
+
+		Point rightCorner = null;
+		found = false;
+		for (int a = rightCornerArea.cols() - 1; a >= 0 && !found; a--) {
+			for (int b = 0; b < rightCornerArea.rows() && !found; b++) {
+				double[] pixel = rightCornerArea.get(b, a);
+				if (pixel[0] == 255) {
+					found = true;
+					rightCorner = new Point(a + 3 * eyeClone.cols() / 4, b);
+				}
+			}
+		}
+
+		if (leftCorner == null || rightCorner == null) {
+			return null;
+		}
+
+		Point[] cornersArray = new Point[2];
+
+		Core.circle(eye, leftCorner, 3, PUPIL_COLOR, -1, 8, 0);
+		Core.circle(eye, rightCorner, 3, PUPIL_COLOR, -1, 8, 0);
+
+		if (left) {
+			cornersArray[0] = leftCorner;
+			cornersArray[1] = rightCorner;
+		} else {
+			cornersArray[0] = rightCorner;
+			cornersArray[1] = leftCorner;
+		}
+
+		return cornersArray;
 	}
 }

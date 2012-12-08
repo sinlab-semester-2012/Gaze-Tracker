@@ -6,6 +6,8 @@ import java.io.OutputStream;
 
 import org.opencv.android.Utils;
 import org.opencv.core.Mat;
+import org.opencv.core.Point;
+import org.opencv.core.Rect;
 
 import android.graphics.Bitmap;
 import android.os.Environment;
@@ -52,5 +54,27 @@ public class MyUtils {
 			bmp.recycle();
 			bmp = null;
 		}
+	}
+	
+	public static Rect getBiggestRect(Rect[] rArray) {
+    	Rect rect = rArray[0];
+    	for (int i = 1; i < rArray.length; i++) {
+    		if (rArray[i].area() > rect.area()) {
+				rect = rArray[i];
+			}
+    	}
+    	return rect;
+	}
+	
+	public static Point offset(Point p, Point offset) {
+		p.x += offset.x;
+		p.y += offset.y;
+		return p;
+    }
+	
+	public static Rect offset(Rect r, Point offset) {
+		r.x += offset.x;
+		r.y += offset.y;
+		return r;
 	}
 }
