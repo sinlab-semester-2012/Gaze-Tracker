@@ -8,10 +8,12 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.os.Bundle;
+import android.text.InputType;
 import android.util.Log;
-import android.view.Menu;
+import android.view.MotionEvent;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.EditText;
 
 public class MainActivity extends Activity {
 	private static final String TAG = "Activity";
@@ -96,12 +98,42 @@ public class MainActivity extends Activity {
 				mOpenCVCallBack)) {
 			Log.e(TAG, "Cannot connect to OpenCV Manager");
 		}
+		
+		showServerDialog();
 
 	}
-
+	
 	@Override
-	public boolean onCreateOptionsMenu(Menu menu) {
-		Log.i(TAG, "onCreateOptionsMenu");
-		return true;
+	public boolean onTouchEvent(MotionEvent event) {
+		if (event.getAction() == MotionEvent.ACTION_DOWN) {
+			showServerDialog();
+		}		
+		return super.onTouchEvent(event);
+	}
+	
+	private void showServerDialog() {
+		AlertDialog.Builder builder = new AlertDialog.Builder(this);
+
+		builder.setTitle("Server");
+		builder.setMessage("Please enter the server address :");
+		
+		final EditText input = new EditText(this);
+		builder.setView(input);
+		
+		builder.setPositiveButton("Confirm", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int id) {
+            	String value = input.getText().toString();
+                Log.d( TAG, "Pin Value : " + value);
+                return;
+            }
+        });
+
+		builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+		        public void onClick(DialogInterface dialog, int which) {
+		            return;   
+		        }
+		});
+		AlertDialog dialog = builder.create();
+		dialog.show();
 	}
 }

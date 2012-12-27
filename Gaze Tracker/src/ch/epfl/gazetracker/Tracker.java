@@ -106,19 +106,19 @@ public class Tracker {
                 	Point leftPupil = detectPupil(faceMat.submat(eyesArray[0]));
                 	Point rightPupil = detectPupil(faceMat.submat(eyesArray[1]));
                 	
-                	/*
-                	Point tl = new Point(eyesArray[0].x, eyesArray[0].y + 0.33 * eyesArray[0].height);
-                	Point br = new Point(eyesArray[0].br().x, eyesArray[0].br().y - 0.33 * eyesArray[0].height);
+                	
+                	Point tl = new Point(eyesArray[0].x - 0.1 * eyesArray[0].width, eyesArray[0].y + 0.33 * eyesArray[0].height);
+                	Point br = new Point(eyesArray[0].br().x + 0.1 * eyesArray[0].width, eyesArray[0].br().y - 0.33 * eyesArray[0].height);
                 	Rect leftEye = new Rect(tl, br);
                 	
-                	Point tl2 = new Point(eyesArray[1].x, eyesArray[1].y + 0.33 * eyesArray[1].height);
-                	Point br2 = new Point(eyesArray[1].br().x, eyesArray[1].br().y - 0.33 * eyesArray[1].height);
+                	Point tl2 = new Point(eyesArray[1].x - 0.1 * eyesArray[1].width, eyesArray[1].y + 0.33 * eyesArray[1].height);
+                	Point br2 = new Point(eyesArray[1].br().x + 0.1 * eyesArray[1].width, eyesArray[1].br().y - 0.33 * eyesArray[1].height);
                 	Rect rightRoi = new Rect(tl2, br2);
-                	*/
+                	
                 	
                 	if (leftPupil != null && rightPupil != null) {
-                		Point[] leftCorners = detectCorners3(faceMat.submat(eyesArray[0]), true);
-                		Point[] rightCorners = detectCorners3(faceMat.submat(eyesArray[1]), false);
+                		Point[] leftCorners = detectCorners3(faceMat.submat(leftEye), true);
+                		Point[] rightCorners = detectCorners3(faceMat.submat(rightRoi), false);
                 		
                 		if (leftCorners != null && rightCorners != null) {
                         		//TODO: use a stable point instead of the center of boxes...
