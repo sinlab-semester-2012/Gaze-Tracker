@@ -25,10 +25,9 @@ public class MyUtils {
 			if (Environment.MEDIA_MOUNTED.equals(state)) {
 				// We can read and write the media
 
-				File baseDir = new File(Environment.getExternalStorageDirectory()
-						+ "/Android/data/ch.epfl.gazetracker");
+				File baseDir = new File(Environment.getExternalStorageDirectory() + "/Android/data/ch.epfl.gazetracker");
 				baseDir.mkdir();
-				
+
 				File myBmp = new File(baseDir, filename + ".png");
 				OutputStream os = new FileOutputStream(myBmp);
 
@@ -55,23 +54,23 @@ public class MyUtils {
 			bmp = null;
 		}
 	}
-	
+
 	public static Rect getBiggestRect(Rect[] rArray) {
-    	Rect rect = rArray[0];
-    	for (int i = 1; i < rArray.length; i++) {
-    		if (rArray[i].area() > rect.area()) {
+		Rect rect = rArray[0];
+		for (int i = 1; i < rArray.length; i++) {
+			if (rArray[i].area() > rect.area()) {
 				rect = rArray[i];
 			}
-    	}
-    	return rect;
+		}
+		return rect;
 	}
-	
+
 	public static Point offset(Point p, Point offset) {
 		p.x += offset.x;
 		p.y += offset.y;
 		return p;
-    }
-	
+	}
+
 	public static Rect offset(Rect r, Point offset) {
 		r.x += offset.x;
 		r.y += offset.y;

@@ -3,8 +3,8 @@ package ch.epfl.gazetracker;
 import java.util.List;
 
 import org.opencv.core.Size;
-import org.opencv.highgui.VideoCapture;
 import org.opencv.highgui.Highgui;
+import org.opencv.highgui.VideoCapture;
 
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -23,9 +23,9 @@ class View extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 
 	public View(Context context) {
 		super(context);
-		
+
 		Log.i(TAG, "Instantiated new " + this.getClass());
-		
+
 		mFps = new FpsMeter();
 		mHolder = getHolder();
 		mHolder.addCallback(this);
@@ -34,11 +34,11 @@ class View extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 
 	public boolean openCamera() {
 		Log.i(TAG, "openCamera");
-		
+
 		synchronized (this) {
 			releaseCamera();
 			mCamera = new VideoCapture(Highgui.CV_CAP_ANDROID + 1);
-			
+
 			if (!mCamera.isOpened()) {
 				mCamera.release();
 				mCamera = null;
@@ -46,13 +46,13 @@ class View extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 				return false;
 			}
 		}
-		
+
 		return true;
 	}
 
 	public void releaseCamera() {
 		Log.i(TAG, "releaseCamera");
-		
+
 		synchronized (this) {
 			if (mCamera != null) {
 				mCamera.release();
@@ -86,25 +86,28 @@ class View extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 
 	}
 
+	@Override
 	public void surfaceChanged(SurfaceHolder _holder, int format, int width, int height) {
 		Log.i(TAG, "surfaceChanged");
 		setupCamera(width, height);
 	}
 
+	@Override
 	public void surfaceCreated(SurfaceHolder holder) {
 		Log.i(TAG, "surfaceCreated");
 		(new Thread(this)).start();
 	}
 
+	@Override
 	public void surfaceDestroyed(SurfaceHolder holder) {
 		Log.i(TAG, "surfaceDestroyed");
 		releaseCamera();
 	}
 
+	@Override
 	public void run() {
 		Log.i(TAG, "Starting processing thread");
 		mFps.init();
-		
 
 		while (true) {
 			Bitmap bmp = null;
