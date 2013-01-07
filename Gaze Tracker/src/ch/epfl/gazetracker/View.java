@@ -141,4 +141,12 @@ class View extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 
 		Log.i(TAG, "Finishing processing thread");
 	}
+	
+	public void calibrateTL() {
+		mTracker.calibrateTL();
+	}
+	
+	public void calibrateBR() {
+		mTracker.calibrateBR();
+	}
 }

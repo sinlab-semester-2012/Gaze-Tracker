@@ -4,6 +4,6 @@
 	<classpathentry kind="src" path="gen"/>
 	<classpathentry kind="con" path="com.android.ide.eclipse.adt.ANDROID_FRAMEWORK"/>
 	<classpathentry exported="true" kind="con" path="com.android.ide.eclipse.adt.LIBRARIES"/>
-	<classpathentry exported="true" kind="lib" path="D:/EPFL/EPFL semestre 7/Project/Android/Eclipse/Workspace/git/Gaze Tracker/Gaze Tracker/libs/oscP5.jar"/>
+	<classpathentry exported="true" kind="lib" path="C:/Users/Florian/Desktop/Project/adt-bundle-windows-x86_64/lib/oscP5/library/oscP5.jar"/>
 	<classpathentry kind="output" path="bin/classes"/>
 </classpath>

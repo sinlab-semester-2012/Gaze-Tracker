@@ -104,8 +104,12 @@ public class MainActivity extends Activity {
 
 	@Override
 	public boolean onTouchEvent(MotionEvent event) {
-		if (event.getAction() == MotionEvent.ACTION_DOWN) {
-			showServerDialog();
+		if (event.getX() < getWindowManager().getDefaultDisplay().getHeight() / 2 && event.getY() < getWindowManager().getDefaultDisplay().getWidth() / 2) {
+			Log.wtf(TAG, "TL pressed");
+			mView.calibrateTL();
+		} else if (event.getX() > getWindowManager().getDefaultDisplay().getHeight() / 2 && event.getY() > getWindowManager().getDefaultDisplay().getWidth() / 2) {
+			Log.wtf(TAG, "BR pressed");
+			mView.calibrateBR();
 		}
 		return super.onTouchEvent(event);
 	}
