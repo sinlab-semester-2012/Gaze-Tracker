@@ -39,7 +39,6 @@ public class Tracker {
 	private static final String id = UUID.randomUUID().toString();
 
 	private NetAddress myBroadcastLocation;
-	private int seatNumber;
 
 	private static final Paint PAINT = new Paint();
 	private static final Scalar FACE_RECT_COLOR = new Scalar(0);
@@ -48,10 +47,8 @@ public class Tracker {
 
 	private Mat mGray;
 
-	private int faceDirection;
 	private int xeyeDirection;
 	private int yeyeDirection;
-	private int totalDirection;
 	private double wherewhere = 0;
 
 	private boolean debugImage = true;
@@ -81,10 +78,8 @@ public class Tracker {
 		noseClassifier = new CascadeClassifier();
 		loadClassifier(context, noseClassifier, R.raw.haarcascade_mcs_nose, "haarcascade_mcs_nose.xml");
 
-		faceDirection = 0;
 		xeyeDirection = 0;
 		yeyeDirection = 0;
-		totalDirection = 0;
 
 		mGray = new Mat();
 
@@ -92,7 +87,6 @@ public class Tracker {
 		PAINT.setTextSize(50);
 
 		myBroadcastLocation = new NetAddress("128.179.153.4", 32000);
-		seatNumber = 50;
 		
 		toTLCalibrate = false;
 		isTLCalibrated = false;
@@ -159,7 +153,7 @@ public class Tracker {
 							double noseX = (nose.tl().x + nose.br().x) / 2;
 
 							double d = leftX - rightX;
-							faceDirection = (int) (((leftX - noseX) * 150 / d) - 75);
+							int faceDirection = (int) (((leftX - noseX) * 150 / d) - 75);
 
 							//
 							double leftEyeLength = leftCorners[1].x - leftCorners[0].x;
@@ -186,25 +180,25 @@ public class Tracker {
 								xeyeDirection = (leftXeyeDirection + rightXeyeDirection)/2;
 							}
 							*/
-							totalDirection = xeyeDirection + faceDirection;
-							wherewhere = (double)(totalDirection-TLxDirection) / (BRxDirection - TLxDirection);
+							xeyeDirection = xeyeDirection + faceDirection;
+							wherewhere = (double)(xeyeDirection-TLxDirection) / (BRxDirection - TLxDirection);
 							
 							if (toTLCalibrate) {
-								TLxDirection = totalDirection;
-								Log.d(TAG, "TLx is set to :" + totalDirection);
+								TLxDirection = xeyeDirection;
+								Log.d(TAG, "TLx is set to :" + xeyeDirection);
 								toTLCalibrate = false;
 								isTLCalibrated = true;
 							}
 							if (toBRCalibrate) {
-								BRxDirection = totalDirection;
-								Log.d(TAG, "BRx is set to :" + totalDirection);
+								BRxDirection = xeyeDirection;
+								Log.d(TAG, "BRx is set to :" + xeyeDirection);
 								toBRCalibrate = false;
 								isBRCalibrated = true;
 							}
 							
 							if (isTLCalibrated && isBRCalibrated) {
 								double where = 0;
-								where = (double)(totalDirection-TLxDirection) / (BRxDirection - TLxDirection);
+								where = (double)(xeyeDirection-TLxDirection) / (BRxDirection - TLxDirection);
 								
 								OscMessage myOscMessage = new OscMessage("/gaze");
 								myOscMessage.add(id);
@@ -414,91 +408,7 @@ public class Tracker {
 
 		return bar;
 	}
-
-	private int findIrisRadius(Mat eye, Point pupil) {
-		int d = 5;
-		while ((int) pupil.x - d >= 0 && (int) pupil.x + d < eye.cols()
-				&& (eye.get((int) pupil.y + 10, (int) pupil.x - d)[0] < 100 || eye.get((int) pupil.y + 10, (int) pupil.x + d)[0] < 100)) {
-			Log.d(TAG, "pupil center : " + pupil.x);
-			Log.d(TAG, "d : " + d);
-			Log.d(TAG, "eye.cols" + eye.cols());
-			d += 5;
-		}
-
-		if ((int) pupil.x - d < 0 || (int) pupil.x + d >= eye.cols()) {
-			return 0;
-		} else {
-			Core.circle(eye, pupil, d, PUPIL_COLOR, 1, 8, 0);
-			return d;
-		}
-	}
-
-	private Point[] detectCorners(Mat eye, boolean left, Point pupil) {
-		Mat eyeClone = eye.clone();
-
-		int d = findIrisRadius(eye, pupil);
-		// eyeClone = eyeClone.rowRange(eyeClone.rows() / 4, 3 * eyeClone.rows()
-		// / 4);
-
-		Log.d(TAG, "l : " + ((int) pupil.x - d));
-		Log.d(TAG, "r : " + ((int) pupil.x + d));
-		Mat leftArea = eyeClone.colRange(0, (int) pupil.x - d);
-		Mat rightArea = eyeClone.colRange((int) pupil.x + d, eyeClone.cols());
-
-		int minLeftBrightness = findMinBrightness(leftArea, 5);
-		int minRightBrightness = findMinBrightness(rightArea, 5);
-
-		Imgproc.threshold(leftArea, leftArea, minLeftBrightness + 15, 255, Imgproc.THRESH_BINARY);
-		Imgproc.threshold(rightArea, rightArea, minRightBrightness + 15, 255, Imgproc.THRESH_BINARY);
-		/*
-		 * if (debugImage) { MyUtils.saveImage(eye, "eye");
-		 * MyUtils.saveImage(leftArea, "leftArea"); MyUtils.saveImage(rightArea,
-		 * "rightArea"); debugImage = false; }
-		 */
-		Point[] corners = new Point[2];
-		boolean found = false;
-		for (int i = leftArea.rows() - 1; i >= 0 && !found; i--) {
-			for (int j = 0; j < leftArea.cols() && !found; j++) {
-				if (leftArea.get(i, j)[0] == 0) {
-					if (left) {
-						corners[1] = new Point(j, i);
-						Core.circle(eye.colRange(0, (int) pupil.x - d), corners[1], 3, PUPIL_COLOR, -1, 8, 0);
-						found = true;
-					} else {
-						corners[0] = new Point(j, i);
-						Core.circle(eye.colRange(0, (int) pupil.x - d), corners[0], 3, PUPIL_COLOR, -1, 8, 0);
-						found = true;
-					}
-				}
-			}
-		}
-		if (!found) {
-			return null;
-		}
-
-		found = false;
-		for (int i = rightArea.rows() - 1; i >= 0 && !found; i--) {
-			for (int j = rightArea.cols() - 1; j >= 0 && !found; j--) {
-				if (rightArea.get(i, j)[0] == 0) {
-					if (left) {
-						corners[0] = MyUtils.offset(new Point(j, i), new Point((int) pupil.x + d + 5, 0));
-						Core.circle(eye.colRange((int) pupil.x + d, eyeClone.cols()), new Point(j, i), 3, PUPIL_COLOR, -1, 8, 0);
-						found = true;
-					} else {
-						corners[1] = MyUtils.offset(new Point(j, i), new Point((int) pupil.x + d + 5, 0));
-						Core.circle(eye.colRange((int) pupil.x + d, eyeClone.cols()), new Point(j, i), 3, PUPIL_COLOR, -1, 8, 0);
-						found = true;
-					}
-				}
-			}
-		}
-		if (!found) {
-			return null;
-		}
-
-		return corners;
-	}
-
+	
 	private void loadClassifier(Context context, CascadeClassifier classifier, int id, String name) {
 		try {
 			InputStream is = context.getResources().openRawResource(id);
@@ -531,20 +441,6 @@ public class Tracker {
 			canvas.drawText(msg, 10 + offsetx, 10 + 50 + offsety, PAINT);
 			msg = null;
 		}
-	}
-
-	private int findMinBrightness(Mat img, int accuracy) {
-		double brightness = 255;
-
-		for (int i = 0; i < img.rows(); i += accuracy) {
-			for (int j = 0; j < img.cols(); j += accuracy) {
-				if (img.get(i, j)[0] < brightness) {
-					brightness = img.get(i, j)[0];
-				}
-			}
-		}
-
-		return (int) brightness;
 	}
 
 	private Point[] detectCorners3(Mat eye, boolean left) {
