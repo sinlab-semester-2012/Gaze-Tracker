@@ -49,9 +49,6 @@ public class Tracker {
 
 	private int xeyeDirection;
 	private int yeyeDirection;
-	private double wherewhere = 0;
-
-	private boolean debugImage = true;
 
 	private CascadeClassifier faceClassifier;
 	private CascadeClassifier eyeClassifier;
@@ -86,7 +83,7 @@ public class Tracker {
 		PAINT.setColor(Color.YELLOW);
 		PAINT.setTextSize(50);
 
-		myBroadcastLocation = new NetAddress("128.179.153.4", 32000);
+		myBroadcastLocation = new NetAddress("192.168.32.130", 32000);
 		
 		toTLCalibrate = false;
 		isTLCalibrated = false;
@@ -100,203 +97,210 @@ public class Tracker {
 	}
 
 	protected Bitmap processFrame(VideoCapture capture) {
-		long processingStart = System.currentTimeMillis();
+		try {
+			long processingStart = System.currentTimeMillis();
 
-		capture.retrieve(mGray, Highgui.CV_CAP_ANDROID_GREY_FRAME);
+			capture.retrieve(mGray, Highgui.CV_CAP_ANDROID_GREY_FRAME);
 
-		long ts = System.currentTimeMillis();
-		Rect face = detectFaces(mGray);
-		long te = System.currentTimeMillis();
-		Log.d(TAG, "Face detection : " + (te - ts) + " ms.");
+			long ts = System.currentTimeMillis();
+			Rect face = detectFaces(mGray);
+			long te = System.currentTimeMillis();
+			Log.d(TAG, "Face detection : " + (te - ts) + " ms.");
 
-		if (face != null) {
-			Mat faceMat = mGray.submat(face);
+			if (face != null) {
+				Mat faceMat = mGray.submat(face);
 
-			ts = System.currentTimeMillis();
-			Rect nose = detectNose(faceMat);
-			te = System.currentTimeMillis();
-			Log.d(TAG, "Nose detection : " + (te - ts) + " ms.");
-
-			if (nose != null) {
 				ts = System.currentTimeMillis();
-				Rect[] eyesArray = detectEyes(faceMat);
+				Rect nose = detectNose(faceMat);
 				te = System.currentTimeMillis();
-				Log.d(TAG, "Eyes detection : " + (te - ts) + " ms.");
+				Log.d(TAG, "Nose detection : " + (te - ts) + " ms.");
 
-				if (eyesArray != null) {
-					Point leftPupil = detectPupil(faceMat.submat(eyesArray[0]));
-					Point rightPupil = detectPupil(faceMat.submat(eyesArray[1]));
+				if (nose != null) {
+					ts = System.currentTimeMillis();
+					Rect[] eyesArray = detectEyes(faceMat);
+					te = System.currentTimeMillis();
+					Log.d(TAG, "Eyes detection : " + (te - ts) + " ms.");
 
-					Point tl = new Point(eyesArray[0].x - 0.1 * eyesArray[0].width, eyesArray[0].y + 0.33 * eyesArray[0].height);
-					Point br = new Point(eyesArray[0].br().x + 0.1 * eyesArray[0].width, eyesArray[0].br().y - 0.33 * eyesArray[0].height);
-					Rect leftEye = new Rect(tl, br);
+					if (eyesArray != null) {
+						Point leftPupil = detectPupil(faceMat.submat(eyesArray[0]));
+						Point rightPupil = detectPupil(faceMat.submat(eyesArray[1]));
 
-					Point tl2 = new Point(eyesArray[1].x - 0.1 * eyesArray[1].width, eyesArray[1].y + 0.33 * eyesArray[1].height);
-					Point br2 = new Point(eyesArray[1].br().x + 0.1 * eyesArray[1].width, eyesArray[1].br().y - 0.33 * eyesArray[1].height);
-					Rect rightRoi = new Rect(tl2, br2);
+						Point tl = new Point(eyesArray[0].x - 0.1 * eyesArray[0].width, eyesArray[0].y + 0.33 * eyesArray[0].height);
+						Point br = new Point(eyesArray[0].br().x + 0.1 * eyesArray[0].width, eyesArray[0].br().y - 0.33 * eyesArray[0].height);
+						Rect leftEye = new Rect(tl, br);
 
-					if (leftPupil != null && rightPupil != null) {
-						Point[] leftCorners = detectCorners3(faceMat.submat(leftEye), true);
-						Point[] rightCorners = detectCorners3(faceMat.submat(rightRoi), false);
+						Point tl2 = new Point(eyesArray[1].x - 0.1 * eyesArray[1].width, eyesArray[1].y + 0.33 * eyesArray[1].height);
+						Point br2 = new Point(eyesArray[1].br().x + 0.1 * eyesArray[1].width, eyesArray[1].br().y - 0.33 * eyesArray[1].height);
+						Rect rightRoi = new Rect(tl2, br2);
 
-						if (leftCorners != null && rightCorners != null) {
-							if (!isTLCalibrated || !isBRCalibrated) {
-								if (!isTLCalibrated) {
-									msg = "Not TL-calibrated";
-								} else {
-									msg = "Not BR-calibrated";
+						if (leftPupil != null && rightPupil != null) {
+							Point[] leftCorners = detectCorners3(faceMat.submat(leftEye), true);
+							Point[] rightCorners = detectCorners3(faceMat.submat(rightRoi), false);
+
+							if (leftCorners != null && rightCorners != null) {
+								if (!isTLCalibrated || !isBRCalibrated) {
+									if (!isTLCalibrated) {
+										msg = "Not TL-calibrated";
+									} else {
+										msg = "Not BR-calibrated";
+									}
 								}
-							}
-							
-							double leftX = (eyesArray[0].tl().x + eyesArray[0].br().x) / 2;
-							double rightX = (eyesArray[1].tl().x + eyesArray[1].br().x) / 2;
-							double noseX = (nose.tl().x + nose.br().x) / 2;
-
-							double d = leftX - rightX;
-							int faceDirection = (int) (((leftX - noseX) * 150 / d) - 75);
-
-							//
-							double leftEyeLength = leftCorners[1].x - leftCorners[0].x;
-							double leftRatio = (leftPupil.x - leftCorners[0].x)/leftEyeLength;
-							
-							//double rightEyeLength = rightCorners[1].x - rightCorners[0].x;
-							//double rightRatio = (rightPupil.x - rightCorners[0].x)/rightEyeLength;
-
-							int leftXeyeDirection = (int) ((-45/0.4) * leftRatio + (0.5 * 45 / 0.4));
-							//int rightXeyeDirection = (int) ((-45/0.4) * rightRatio + (0.5 * 45 / 0.4));
-							
-							//Log.d(TAG, "left and right ratio" + leftRatio + ", " + rightRatio);
-							//Log.d(TAG, "left and right direction" + leftXeyeDirection + ", " + rightXeyeDirection);
-							
-							xeyeDirection = leftXeyeDirection;
-							/*
-							if (Math.abs(leftXeyeDirection) > 60 && Math.abs(rightXeyeDirection) > 60) {
-								xeyeDirection = (leftXeyeDirection + rightXeyeDirection)/2;
-							} else if (Math.abs(leftXeyeDirection) > 60) {
-								xeyeDirection = rightXeyeDirection;
-							} else if (Math.abs(rightXeyeDirection) > 60) {
-								xeyeDirection = leftXeyeDirection;
-							} else {
-								xeyeDirection = (leftXeyeDirection + rightXeyeDirection)/2;
-							}
-							*/
-							xeyeDirection = xeyeDirection + faceDirection;
-							wherewhere = (double)(xeyeDirection-TLxDirection) / (BRxDirection - TLxDirection);
-							
-							if (toTLCalibrate) {
-								TLxDirection = xeyeDirection;
-								Log.d(TAG, "TLx is set to :" + xeyeDirection);
-								toTLCalibrate = false;
-								isTLCalibrated = true;
-							}
-							if (toBRCalibrate) {
-								BRxDirection = xeyeDirection;
-								Log.d(TAG, "BRx is set to :" + xeyeDirection);
-								toBRCalibrate = false;
-								isBRCalibrated = true;
-							}
-							
-							if (isTLCalibrated && isBRCalibrated) {
-								double where = 0;
-								where = (double)(xeyeDirection-TLxDirection) / (BRxDirection - TLxDirection);
 								
+								double leftX = (eyesArray[0].tl().x + eyesArray[0].br().x) / 2;
+								double rightX = (eyesArray[1].tl().x + eyesArray[1].br().x) / 2;
+								double noseX = (nose.tl().x + nose.br().x) / 2;
+
+								double d = leftX - rightX;
+								int faceDirection = (int) (((leftX - noseX) * 150 / d) - 75);
+
+								//
+								double leftEyeLength = leftCorners[1].x - leftCorners[0].x;
+								double leftRatio = (leftPupil.x - leftCorners[0].x)/leftEyeLength;
+								
+								//double rightEyeLength = rightCorners[1].x - rightCorners[0].x;
+								//double rightRatio = (rightPupil.x - rightCorners[0].x)/rightEyeLength;
+
+								int leftXeyeDirection = (int) ((-45/0.4) * leftRatio + (0.5 * 45 / 0.4));
+								//int rightXeyeDirection = (int) ((-45/0.4) * rightRatio + (0.5 * 45 / 0.4));
+								
+								//Log.d(TAG, "left and right ratio" + leftRatio + ", " + rightRatio);
+								//Log.d(TAG, "left and right direction" + leftXeyeDirection + ", " + rightXeyeDirection);
+								
+								xeyeDirection = leftXeyeDirection;
+								/*
+								if (Math.abs(leftXeyeDirection) > 60 && Math.abs(rightXeyeDirection) > 60) {
+									xeyeDirection = (leftXeyeDirection + rightXeyeDirection)/2;
+								} else if (Math.abs(leftXeyeDirection) > 60) {
+									xeyeDirection = rightXeyeDirection;
+								} else if (Math.abs(rightXeyeDirection) > 60) {
+									xeyeDirection = leftXeyeDirection;
+								} else {
+									xeyeDirection = (leftXeyeDirection + rightXeyeDirection)/2;
+								}
+								*/
+								xeyeDirection = xeyeDirection + faceDirection;
+															
+								if (toTLCalibrate) {
+									TLxDirection = xeyeDirection;
+									Log.d(TAG, "TLx is set to :" + xeyeDirection);
+									toTLCalibrate = false;
+									isTLCalibrated = true;
+								}
+								if (toBRCalibrate) {
+									BRxDirection = xeyeDirection;
+									Log.d(TAG, "BRx is set to :" + xeyeDirection);
+									toBRCalibrate = false;
+									isBRCalibrated = true;
+								}
+								
+								if (isTLCalibrated && isBRCalibrated) {
+									double xPosition = (double)(xeyeDirection-TLxDirection) / (BRxDirection - TLxDirection);
+									double yPosition = 0;
+									if (xPosition >= 0 && xPosition <= 1) {
+										OscMessage myOscMessage = new OscMessage("/gaze");
+										myOscMessage.add(id);
+										myOscMessage.add(xPosition);
+										myOscMessage.add(yPosition);
+
+										msg = "Ok.";
+										OscP5.flush(myOscMessage, myBroadcastLocation);
+									} else {
+										msg = "Bad value.";
+									}
+								}
+								
+								
+								
+								/*
+								// TODO: use a stable point instead of the center of
+								// boxes...
+								double leftX = (eyesArray[0].tl().x + eyesArray[0].br().x) / 2;
+								double rightX = (eyesArray[1].tl().x + eyesArray[1].br().x) / 2;
+								double noseX = (nose.tl().x + nose.br().x) / 2;
+
+								double d = leftX - rightX;
+								faceDirection = (int) (((leftX - noseX) * 150 / d) - 75);
+
+								//
+								double leftEyeLength = leftCorners[1].x - leftCorners[0].x;
+								double leftRatio = (leftPupil.x - leftCorners[0].x)/leftEyeLength;
+								
+								double rightEyeLength = rightCorners[1].x - rightCorners[0].x;
+								double rightRatio = (rightPupil.x - rightCorners[0].x)/rightEyeLength;
+
+								int leftXeyeDirection = (int) ((-45/0.4) * leftRatio + (0.5 * 45 / 0.4));
+								int rightXeyeDirection = (int) ((-45/0.4) * rightRatio + (0.5 * 45 / 0.4));
+								
+								Log.d(TAG, "left and right ratio" + leftRatio + ", " + rightRatio);
+								Log.d(TAG, "left and right direction" + leftXeyeDirection + ", " + rightXeyeDirection);
+								
+								if (Math.abs(leftXeyeDirection) > 60 && Math.abs(rightXeyeDirection) > 60) {
+									xeyeDirection = (leftXeyeDirection + rightXeyeDirection)/2;
+								} else if (Math.abs(leftXeyeDirection) > 60) {
+									xeyeDirection = rightXeyeDirection;
+								} else if (Math.abs(rightXeyeDirection) > 60) {
+									xeyeDirection = leftXeyeDirection;
+								} else {
+									xeyeDirection = (leftXeyeDirection + rightXeyeDirection)/2;
+								}
+								
+								totalDirection = xeyeDirection + faceDirection;
+
 								OscMessage myOscMessage = new OscMessage("/gaze");
 								myOscMessage.add(id);
-								myOscMessage.add(where);
+								myOscMessage.add(System.currentTimeMillis());
+								myOscMessage.add(seatNumber);
+								myOscMessage.add(totalDirection);
 
-								msg = "Ok.";
 								OscP5.flush(myOscMessage, myBroadcastLocation);
-							}
-							
-							
-							
-							/*
-							// TODO: use a stable point instead of the center of
-							// boxes...
-							double leftX = (eyesArray[0].tl().x + eyesArray[0].br().x) / 2;
-							double rightX = (eyesArray[1].tl().x + eyesArray[1].br().x) / 2;
-							double noseX = (nose.tl().x + nose.br().x) / 2;
+								*/
+								// Draw the left pupil
+								Core.circle(mGray, MyUtils.offset(MyUtils.offset(leftPupil, eyesArray[0].tl()), face.tl()), 3, PUPIL_COLOR, -1, 8, 0);
+								Core.circle(mGray, MyUtils.offset(MyUtils.offset(rightPupil, eyesArray[1].tl()), face.tl()), 3, PUPIL_COLOR, -1, 8, 0);
 
-							double d = leftX - rightX;
-							faceDirection = (int) (((leftX - noseX) * 150 / d) - 75);
-
-							//
-							double leftEyeLength = leftCorners[1].x - leftCorners[0].x;
-							double leftRatio = (leftPupil.x - leftCorners[0].x)/leftEyeLength;
-							
-							double rightEyeLength = rightCorners[1].x - rightCorners[0].x;
-							double rightRatio = (rightPupil.x - rightCorners[0].x)/rightEyeLength;
-
-							int leftXeyeDirection = (int) ((-45/0.4) * leftRatio + (0.5 * 45 / 0.4));
-							int rightXeyeDirection = (int) ((-45/0.4) * rightRatio + (0.5 * 45 / 0.4));
-							
-							Log.d(TAG, "left and right ratio" + leftRatio + ", " + rightRatio);
-							Log.d(TAG, "left and right direction" + leftXeyeDirection + ", " + rightXeyeDirection);
-							
-							if (Math.abs(leftXeyeDirection) > 60 && Math.abs(rightXeyeDirection) > 60) {
-								xeyeDirection = (leftXeyeDirection + rightXeyeDirection)/2;
-							} else if (Math.abs(leftXeyeDirection) > 60) {
-								xeyeDirection = rightXeyeDirection;
-							} else if (Math.abs(rightXeyeDirection) > 60) {
-								xeyeDirection = leftXeyeDirection;
 							} else {
-								xeyeDirection = (leftXeyeDirection + rightXeyeDirection)/2;
+								msg = "Eye Corners not found.";
 							}
-							
-							totalDirection = xeyeDirection + faceDirection;
-
-							OscMessage myOscMessage = new OscMessage("/gaze");
-							myOscMessage.add(id);
-							myOscMessage.add(System.currentTimeMillis());
-							myOscMessage.add(seatNumber);
-							myOscMessage.add(totalDirection);
-
-							OscP5.flush(myOscMessage, myBroadcastLocation);
-							*/
-							// Draw the left pupil
-							Core.circle(mGray, MyUtils.offset(MyUtils.offset(leftPupil, eyesArray[0].tl()), face.tl()), 3, PUPIL_COLOR, -1, 8, 0);
-							Core.circle(mGray, MyUtils.offset(MyUtils.offset(rightPupil, eyesArray[1].tl()), face.tl()), 3, PUPIL_COLOR, -1, 8, 0);
-
 						} else {
-							msg = "Eye Corners not found.";
+							msg = "Pupil not found.";
 						}
+
+						// Draw the rectangles around left and right eyes.
+						Core.rectangle(mGray, MyUtils.offset(eyesArray[0].tl(), face.tl()), MyUtils.offset(eyesArray[0].br(), face.tl()), EYES_RECT_COLOR, 3);
+						Core.rectangle(mGray, MyUtils.offset(eyesArray[1].tl(), face.tl()), MyUtils.offset(eyesArray[1].br(), face.tl()), EYES_RECT_COLOR, 3);
 					} else {
-						msg = "Pupil not found.";
+						msg = "Eye(s) not found.";
 					}
 
-					// Draw the rectangles around left and right eyes.
-					Core.rectangle(mGray, MyUtils.offset(eyesArray[0].tl(), face.tl()), MyUtils.offset(eyesArray[0].br(), face.tl()), EYES_RECT_COLOR, 3);
-					Core.rectangle(mGray, MyUtils.offset(eyesArray[1].tl(), face.tl()), MyUtils.offset(eyesArray[1].br(), face.tl()), EYES_RECT_COLOR, 3);
+					// Draw the rectangle around the nose.
+					Core.rectangle(mGray, MyUtils.offset(nose.tl(), face.tl()), MyUtils.offset(nose.br(), face.tl()), EYES_RECT_COLOR, 3);
 				} else {
-					msg = "Eye(s) not found.";
+					msg = "Nose not found.";
 				}
-
-				// Draw the rectangle around the nose.
-				Core.rectangle(mGray, MyUtils.offset(nose.tl(), face.tl()), MyUtils.offset(nose.br(), face.tl()), EYES_RECT_COLOR, 3);
+				// Draw the rectangle around the face.
+				Core.rectangle(mGray, face.tl(), face.br(), FACE_RECT_COLOR, 3);
 			} else {
-				msg = "Nose not found.";
+				msg = "Face not found.";
 			}
-			// Draw the rectangle around the face.
-			Core.rectangle(mGray, face.tl(), face.br(), FACE_RECT_COLOR, 3);
-		} else {
-			msg = "Face not found.";
-		}
 
-		ts = System.currentTimeMillis();
-		Bitmap bmp = Bitmap.createBitmap(mGray.cols(), mGray.rows(), Bitmap.Config.ARGB_8888);
+			ts = System.currentTimeMillis();
+			Bitmap bmp = Bitmap.createBitmap(mGray.cols(), mGray.rows(), Bitmap.Config.ARGB_8888);
 
-		try {
-			Utils.matToBitmap(mGray, bmp);
+			try {
+				Utils.matToBitmap(mGray, bmp);
+			} catch (Exception e) {
+				Log.e(TAG, "Utils.matToBitmap() throws an exception: " + e.getMessage());
+				bmp.recycle();
+				bmp = null;
+			}
+			te = System.currentTimeMillis();
+			Log.d(TAG, "Creating Bitmap : " + (te - ts) + " ms.");
+			long processingEnd = System.currentTimeMillis();
+			Log.d(TAG, "Processing frame : " + (processingEnd - processingStart) + " ms.");
+			return bmp;
 		} catch (Exception e) {
-			Log.e(TAG, "Utils.matToBitmap() throws an exception: " + e.getMessage());
-			bmp.recycle();
-			bmp = null;
+			return null;
 		}
-		te = System.currentTimeMillis();
-		Log.d(TAG, "Creating Bitmap : " + (te - ts) + " ms.");
-		long processingEnd = System.currentTimeMillis();
-		Log.d(TAG, "Processing frame : " + (processingEnd - processingStart) + " ms.");
-		return bmp;
 	}
 
 	private Rect detectFaces(Mat img) {
